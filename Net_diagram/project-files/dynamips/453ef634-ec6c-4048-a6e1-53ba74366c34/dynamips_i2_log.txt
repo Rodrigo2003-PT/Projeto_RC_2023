@@ -1,0 +1,41 @@
+Apr 13 10:28:48.514 HYPERVISOR: Release 0.2.23-amd64/Linux (tag 2023010200)
+Apr 13 10:28:48.514 HYPERVISOR: Started on IP = 127.0.0.1, TCP port = 50057.
+Apr 13 10:28:48.525 HYPERVISOR: exec_cmd: hypervisor version 
+Apr 13 10:28:48.526 HYPERVISOR: exec_cmd: hypervisor working_dir /home/user/GNS3/projects/Net_diagram/project-files/dynamips 
+Apr 13 10:28:48.526 GENERAL: working_dir=/home/user/GNS3/projects/Net_diagram/project-files/dynamips
+Apr 13 10:28:48.527 HYPERVISOR: exec_cmd: hypervisor working_dir /home/user/GNS3/projects/Net_diagram/project-files/dynamips/453ef634-ec6c-4048-a6e1-53ba74366c34 
+Apr 13 10:28:48.527 GENERAL: working_dir=/home/user/GNS3/projects/Net_diagram/project-files/dynamips/453ef634-ec6c-4048-a6e1-53ba74366c34
+Apr 13 10:28:48.528 HYPERVISOR: exec_cmd: vm create R2 2 c2691 
+Apr 13 10:28:48.528 VM: VM R2 created.
+Apr 13 10:28:48.529 HYPERVISOR: exec_cmd: vm set_con_tcp_port R2 5007 
+Apr 13 10:28:48.529 HYPERVISOR: exec_cmd: c2691 get_mac_addr R2 
+Apr 13 10:28:48.530 HYPERVISOR: exec_cmd: vm set_ios R2 /home/user/GNS3/images/IOS/c2691-adventerprisek9-mz.124-15.T14.image 
+Apr 13 10:28:48.531 HYPERVISOR: exec_cmd: vm get_status R2 
+Apr 13 10:28:48.532 HYPERVISOR: exec_cmd: vm set_idle_pc R2 0x60bcf9f8 
+Apr 13 10:28:48.533 HYPERVISOR: exec_cmd: vm set_ram R2 192 
+Apr 13 10:28:48.533 HYPERVISOR: exec_cmd: vm set_nvram R2 256 
+Apr 13 10:28:48.534 HYPERVISOR: exec_cmd: vm set_disk0 R2 0 
+Apr 13 10:28:48.535 HYPERVISOR: exec_cmd: vm get_status R2 
+Apr 13 10:28:48.536 HYPERVISOR: exec_cmd: vm slot_add_binding R2 1 0 NM-1FE-TX 
+Apr 13 10:28:48.536 HYPERVISOR: exec_cmd: vm get_status R2 
+Apr 13 10:28:48.537 HYPERVISOR: exec_cmd: vm slot_add_binding R2 0 16 WIC-1T 
+Apr 13 10:28:48.600 HYPERVISOR: exec_cmd: vm set_ios R2 /home/user/GNS3/images/IOS/c2691-adventerprisek9-mz.124-15.T14.image 
+Apr 13 10:31:21.010 HYPERVISOR: exec_cmd: vm set_ios R2 /home/user/GNS3/images/IOS/c2691-adventerprisek9-mz.124-15.T14.image 
+Apr 13 10:31:45.541 HYPERVISOR: exec_cmd: vm set_ios R2 /home/user/GNS3/images/IOS/c2691-adventerprisek9-mz.124-15.T14.image 
+Apr 13 10:31:55.669 HYPERVISOR: exec_cmd: vm set_ios R2 /home/user/GNS3/images/IOS/c2691-adventerprisek9-mz.124-15.T14.image 
+Apr 13 10:32:07.786 HYPERVISOR: exec_cmd: vm set_ios R2 /home/user/GNS3/images/IOS/c2691-adventerprisek9-mz.124-15.T14.image 
+Apr 13 10:32:57.774 HYPERVISOR: exec_cmd: nio create_udp udp-7749a677-eef8-45f6-81d5-a35ba055dd24 10002 127.0.0.1 10003 
+Apr 13 10:32:58.045 HYPERVISOR: exec_cmd: vm slot_add_nio_binding R2 0 1 udp-7749a677-eef8-45f6-81d5-a35ba055dd24 
+Apr 13 10:32:58.071 HYPERVISOR: exec_cmd: vm get_status R2 
+Apr 13 10:33:13.730 HYPERVISOR: exec_cmd: nio create_udp udp-6bc142b7-0bbd-40ce-9922-c2b652eb26ee 10006 127.0.0.1 10007 
+Apr 13 10:33:13.736 HYPERVISOR: exec_cmd: vm slot_add_nio_binding R2 0 0 udp-6bc142b7-0bbd-40ce-9922-c2b652eb26ee 
+Apr 13 10:33:13.736 HYPERVISOR: exec_cmd: vm get_status R2 
+Apr 13 10:40:06.289 HYPERVISOR: exec_cmd: vm set_ghost_status R2 2 
+Apr 13 10:40:06.290 HYPERVISOR: exec_cmd: vm set_ghost_file R2 /home/user/GNS3/projects/Net_diagram/project-files/dynamips/c2691-adventerprisek9-mz.124-15.T14.image-192.ghost 
+Apr 13 10:40:06.291 HYPERVISOR: exec_cmd: vm get_status R2 
+Apr 13 10:40:06.291 HYPERVISOR: exec_cmd: vm set_config R2 configs/i2_startup-config.cfg 
+Apr 13 10:40:06.292 HYPERVISOR: exec_cmd: vm start R2 
+Apr 13 10:40:36.651 HYPERVISOR: exec_cmd: vm extract_config R2 
+Apr 13 10:40:36.713 HYPERVISOR: exec_cmd: vm extract_config R2 
+Apr 13 10:53:36.986 HYPERVISOR: exec_cmd: vm extract_config R2 
+Apr 13 10:53:36.997 HYPERVISOR: exec_cmd: vm extract_config R2 
