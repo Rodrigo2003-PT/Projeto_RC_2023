@@ -20,9 +20,9 @@ void handle_admin_console(char *buffer, int sockfd, int slen, struct sockaddr_in
             char* password = strtok(NULL, " ");
             char* userType = strtok(NULL, " \n");
             if (addUser(username, password, userType)) {
-                sendto(sockfd, "User added successfully\n", strlen("User added successfully\n"), MSG_CONFIRM, (const struct sockaddr *)&cliaddr, slen);
+                sendto(sockfd, "user added successfully\n", strlen("user added successfully\n"), MSG_CONFIRM, (const struct sockaddr *)&cliaddr, slen);
             } else {
-                sendto(sockfd, "Failed to add user\n", strlen("Failed to add user\n"), MSG_CONFIRM, (const struct sockaddr *)&cliaddr, slen);
+                sendto(sockfd, "failed to add user\n", strlen("failed to add user\n"), MSG_CONFIRM, (const struct sockaddr *)&cliaddr, slen);
                 }
         } 
         else if (strcmp(token, "DEL") == 0) {
@@ -30,15 +30,14 @@ void handle_admin_console(char *buffer, int sockfd, int slen, struct sockaddr_in
             char* username = strtok(NULL, " \n");
 
             if (deleteUser(username)) {
-                sendto(sockfd, "User deleted successfully\n", strlen("User deleted successfully\n"), MSG_CONFIRM, (const struct sockaddr *)&cliaddr, slen);
+                sendto(sockfd, "user deleted successfully\n", strlen("user deleted successfully\n"), MSG_CONFIRM, (const struct sockaddr *)&cliaddr, slen);
             }
             else {
-                sendto(sockfd, "Failed to delete user\n", strlen("Failed to delete user\n"), MSG_CONFIRM, (const struct sockaddr *)&cliaddr, slen);
+                sendto(sockfd, "failed to delete user\n", strlen("failed to delete user\n"), MSG_CONFIRM, (const struct sockaddr *)&cliaddr, slen);
             }
         } 
         else if (strcmp(token, "LIST\n") == 0) {
-            listUsers();
-            sendto(sockfd, "User list sent\n", strlen("User list sent\n"), MSG_CONFIRM, (const struct sockaddr *)&cliaddr, slen);
+            listUsers(sockfd,slen,cliaddr);
         }
         else if (strcmp(token, "QUIT\n") == 0) {
             quitConsole();
@@ -48,7 +47,7 @@ void handle_admin_console(char *buffer, int sockfd, int slen, struct sockaddr_in
             quitServer(sockfd);
         }
         else {
-            sendto(sockfd, "Invalid command\n", strlen("Invalid command\n"), MSG_CONFIRM, (const struct sockaddr *)&cliaddr, slen);
+            sendto(sockfd, "invalid command\n", strlen("invalid command\n"), MSG_CONFIRM, (const struct sockaddr *)&cliaddr, slen);
         }
     }
 }
@@ -73,10 +72,12 @@ bool admin_authentication(char *buffer, int sockfd, int slen, struct sockaddr_in
 
         // Verify credentials
         if (strcmp(username, "admin") == 0 && strcmp(password, "password") == 0) {
+            sendto(sockfd, "authentication successful\n", strlen("authentication successful\n"), MSG_CONFIRM, (const struct sockaddr *)&cliaddr, slen);
             printf("Authentication successful.\n");
             return true;
         } 
         else {
+            sendto(sockfd, "authentication failed: <username> <password>\n", strlen("authentication failed <username> <password>\n"), MSG_CONFIRM, (const struct sockaddr *)&cliaddr, slen);
             printf("Authentication failed.\n");
         }
     }
@@ -193,7 +194,7 @@ bool deleteUser(char* username) {
 }
 
 // Function to handle LIST command
-void listUsers() {
+void listUsers(int sockfd, int slen, struct sockaddr_in cliaddr) {
 
     FILE* fp;
     char* token;
@@ -208,11 +209,11 @@ void listUsers() {
 
     while (fgets(line, MAXLINE, fp) != NULL) {
         token = strtok(line, ";");
-        printf("Username: %s\n", token);
+        sendto(sockfd, token, strlen(token), MSG_CONFIRM, (const struct sockaddr *)&cliaddr, slen);
         token = strtok(NULL, ";");
-        printf("Password: %s\n", token);
-        token = strtok(NULL, ";\n");
-        printf("User type: %s\n\n", token);
+        sendto(sockfd, token, strlen(token), MSG_CONFIRM, (const struct sockaddr *)&cliaddr, slen);
+        token = strtok(NULL, ";");
+        sendto(sockfd, token, strlen(token), MSG_CONFIRM, (const struct sockaddr *)&cliaddr, slen);
     }
 
     fclose(fp);
