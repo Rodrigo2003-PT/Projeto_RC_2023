@@ -1,8 +1,11 @@
 #include "admin_functions.h"
 
-void handle_admin_console(char *buffer, int sockfd, int slen, struct sockaddr_in cliaddr){
+void handle_admin_console(int sockfd){
 
     int recv_len;
+    char buffer[MAXLINE];
+    struct sockaddr_in cliaddr;
+    socklen_t slen = sizeof(cliaddr);
 
     while (1) {
 
@@ -40,7 +43,7 @@ void handle_admin_console(char *buffer, int sockfd, int slen, struct sockaddr_in
             listUsers(sockfd,slen,cliaddr);
         }
         else if (strcmp(token, "QUIT\n") == 0) {
-            quitConsole();
+            quitConsole(sockfd);
             break;
         } 
         else if (strcmp(token, "QUIT_SERVER\n") == 0) {
@@ -52,11 +55,15 @@ void handle_admin_console(char *buffer, int sockfd, int slen, struct sockaddr_in
     }
 }
 
-bool admin_authentication(char *buffer, int sockfd, int slen, struct sockaddr_in cliaddr){
+void admin_authentication(int sockfd){
 
     int recv_len;
+    char buffer[MAXLINE];
+    bool authenticated = false;
+    struct sockaddr_in cliaddr;
+    socklen_t slen = sizeof(cliaddr);
 
-    while (1) {
+    while (!authenticated) {
 
         // Receive credentials from admin console
         if((recv_len = recvfrom(sockfd, buffer, MAXLINE, 0, (struct sockaddr *) &cliaddr, (socklen_t *)&slen)) == -1) {
@@ -72,9 +79,9 @@ bool admin_authentication(char *buffer, int sockfd, int slen, struct sockaddr_in
 
         // Verify credentials
         if (strcmp(username, "admin") == 0 && strcmp(password, "password") == 0) {
+            authenticated = true;
             sendto(sockfd, "authentication successful\n", strlen("authentication successful\n"), MSG_CONFIRM, (const struct sockaddr *)&cliaddr, slen);
-            printf("Authentication successful.\n");
-            return true;
+            handle_admin_console(sockfd);
         } 
         else {
             sendto(sockfd, "authentication failed: <username> <password>\n", strlen("authentication failed <username> <password>\n"), MSG_CONFIRM, (const struct sockaddr *)&cliaddr, slen);
@@ -82,6 +89,8 @@ bool admin_authentication(char *buffer, int sockfd, int slen, struct sockaddr_in
         }
     }
 }
+
+void client_authentication(int sockfd){};
 
 // Function to handle ADD_USER command
 bool addUser(char* username, char* password, char* userType) {
@@ -220,8 +229,9 @@ void listUsers(int sockfd, int slen, struct sockaddr_in cliaddr) {
 }
 
 // Function to handle QUIT command
-void quitConsole() {
+void quitConsole(int sockfd) {
     printf("Admin console session ended.\n");
+    close(sockfd);
 }
 
 // Function to handle QUIT_SERVER command
