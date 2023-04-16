@@ -7,6 +7,9 @@ void handle_admin_console(int sockfd){
     struct sockaddr_in cliaddr;
     socklen_t slen = sizeof(cliaddr);
 
+    sem_init(&file_semaphore, 0, 1);
+
+
     while (1) {
 
         // Receive command from admin console
@@ -22,15 +25,22 @@ void handle_admin_console(int sockfd){
             char* username = strtok(NULL, " ");
             char* password = strtok(NULL, " ");
             char* userType = strtok(NULL, " \n");
+
+            sem_wait(&file_semaphore);
+
             if (addUser(username, password, userType)) {
                 sendto(sockfd, "user added successfully\n", strlen("user added successfully\n"), MSG_CONFIRM, (const struct sockaddr *)&cliaddr, slen);
             } else {
                 sendto(sockfd, "failed to add user\n", strlen("failed to add user\n"), MSG_CONFIRM, (const struct sockaddr *)&cliaddr, slen);
                 }
+            
+            sem_post(&file_semaphore);
         } 
         else if (strcmp(token, "DEL") == 0) {
 
             char* username = strtok(NULL, " \n");
+
+            sem_wait(&file_semaphore);
 
             if (deleteUser(username)) {
                 sendto(sockfd, "user deleted successfully\n", strlen("user deleted successfully\n"), MSG_CONFIRM, (const struct sockaddr *)&cliaddr, slen);
@@ -38,9 +48,13 @@ void handle_admin_console(int sockfd){
             else {
                 sendto(sockfd, "failed to delete user\n", strlen("failed to delete user\n"), MSG_CONFIRM, (const struct sockaddr *)&cliaddr, slen);
             }
+
+            sem_post(&file_semaphore);
         } 
         else if (strcmp(token, "LIST\n") == 0) {
+            sem_wait(&file_semaphore);
             listUsers(sockfd,slen,cliaddr);
+            sem_post(&file_semaphore);
         }
         else if (strcmp(token, "QUIT\n") == 0) {
             quitConsole(sockfd);
@@ -144,8 +158,6 @@ bool addUser(char* username, char* password, char* userType) {
     // Write the new user information to the file
     fprintf(fp, "%s;%s;%s\n", username, password, userType);
 
-    printf("Here");
-
     // Close the file
     fclose(fp);
 
@@ -231,14 +243,16 @@ void listUsers(int sockfd, int slen, struct sockaddr_in cliaddr) {
 // Function to handle QUIT command
 void quitConsole(int sockfd) {
     printf("Admin console session ended.\n");
+    sem_destroy(&file_semaphore);
     close(sockfd);
 }
 
 // Function to handle QUIT_SERVER command
 void quitServer(int sockfd) {
     printf("Server shutting down.\n");
-    close(sockfd);
+    sem_destroy(&file_semaphore);
     exit(EXIT_SUCCESS);
+    close(sockfd);
 }
 
 void erro(char *s) {

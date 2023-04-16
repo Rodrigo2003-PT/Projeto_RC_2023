@@ -1,7 +1,9 @@
 #ifndef admin_functions
 #define admin_functions  /* Include guard */
 
+
 #include <netinet/in.h>
+#include <semaphore.h>
 #include <stdbool.h>
 #include <unistd.h>
 #include <stdlib.h>
@@ -9,6 +11,8 @@
 #include <stdio.h>
 
 #define MAXLINE 1024
+
+sem_t file_semaphore;
 
 void erro(char *s);
 void quitServer(int sockfd);
