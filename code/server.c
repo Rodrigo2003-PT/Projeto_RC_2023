@@ -5,22 +5,33 @@ int main() {
 
     struct sockaddr_in servaddr_udp, servaddr_tcp, cliaddr_tcp;
     socklen_t len_tcp = sizeof(cliaddr_tcp);
-    int udp_sockfd, tcp_sockfd, conn_tcp;
+    int udp_sockfds[NUM_ADMIN_THREADS];
+    int tcp_sockfd, conn_tcp, udp_port, i;
 
-    // Cria um socket para recepção de pacotes UDP
-	if((udp_sockfd=socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)) == -1) {
-		erro("Erro na criação do socket");
-	}
+    for (i = 0, udp_port = FIRST_UDP_PORT; i < NUM_ADMIN_THREADS; i++, udp_port++) {
 
-    // Filling server information
-    servaddr_udp.sin_family = AF_INET;
-    servaddr_udp.sin_addr.s_addr = INADDR_ANY;
-    servaddr_udp.sin_port = htons(PORT_UDP);
+        if ((udp_sockfds[i] = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)) == -1) {
+            perror("Error creating UDP socket");
+            exit(EXIT_FAILURE);
+        }
 
-    // Associa o socket à informação de endereço
-	if(bind(udp_sockfd,(struct sockaddr*)&servaddr_udp, sizeof(servaddr_udp)) == -1) {
-		erro("Erro no bind");
-	}
+        // Fill server information
+        servaddr_udp.sin_family = AF_INET;
+        servaddr_udp.sin_addr.s_addr = INADDR_ANY;
+        servaddr_udp.sin_port = htons(udp_port);
+
+        // Bind UDP socket to address
+        if (bind(udp_sockfds[i], (struct sockaddr*)&servaddr_udp, sizeof(servaddr_udp)) == -1) {
+            perror("Error binding UDP socket");
+            exit(EXIT_FAILURE);
+        }
+
+        // Start admin authentication thread
+        if (pthread_create(&admin_threads[i], NULL, handle_admin, &udp_sockfds[i]) != 0) {
+            perror("Error creating admin thread");
+            exit(EXIT_FAILURE);
+        }
+    }
 
      // Create TCP socket
     if ((tcp_sockfd = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
@@ -42,29 +53,55 @@ int main() {
         erro("Erro no listen do socket");
     }
 
+    // Handle client connections
     while (1) {
 
-        admin_process = fork();
-
-        if (admin_process == 0) {
-            admin_authentication(udp_sockfd);
-            exit(0);
-        }
-
         if ((conn_tcp = accept(tcp_sockfd, (struct sockaddr *)&cliaddr_tcp, &len_tcp)) == -1) {
-            erro("Erro ao aceitar conexão TCP");
+            perror("Error accepting TCP connection");
+            continue;
         }
 
-        client_process = fork();
+        // Find an available slot for the client thread
+        for (i = 0; i < MAX_CLIENTS; i++) {
+            if (client_threads[i] == 0) {
+                if (pthread_create(&client_threads[i], NULL, handle_client, &conn_tcp) != 0) {
+                    perror("error creating client thread");
+                    close(conn_tcp);
+                    break;
+                }
+                break;
+            }
+        }
 
-        if (client_process == 0) {
-            client_authentication(conn_tcp);
+        // Maximum number of clients reached
+        if (i == MAX_CLIENTS) {
+            fprintf(stderr, "Maximum number of clients reached.\n");
             close(conn_tcp);
-            exit(0);
         }
+    }
 
+    for (i = 0; i < NUM_ADMIN_THREADS; i++) {
+        pthread_join(admin_threads[i], NULL);
+    }
+
+    for (i = 0; i < MAX_CLIENTS; i++) {
+        pthread_join(client_threads[i], NULL);
     }
 
     return 0;
+}
 
+// Function to handle admin authentication
+void *handle_admin(void *arg) {
+    int udp_sockfd = *(int*)arg;
+    admin_authentication(udp_sockfd);
+    return NULL;
+}
+
+// Function to handle client authentication
+void *handle_client(void *arg) {
+    int conn_tcp = *(int*)arg;
+    client_authentication(conn_tcp);
+    close(conn_tcp);
+    return NULL;
 }
