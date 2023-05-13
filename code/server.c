@@ -3,6 +3,9 @@
 // Driver code
 int main() {
 
+    ClientList* list_clients = readClientsFromFile();
+    TopicList* list_topics = readTopicsFromFile();
+
     struct sockaddr_in servaddr_udp, servaddr_tcp, cliaddr_tcp;
     socklen_t len_tcp = sizeof(cliaddr_tcp);
     int udp_sockfds[NUM_ADMIN_THREADS];
@@ -26,8 +29,10 @@ int main() {
             exit(EXIT_FAILURE);
         }
 
+        HandleAdminArgs admin_args = {udp_sockfds[i],list_clients, list_topics};
+
         // Start admin authentication thread
-        if (pthread_create(&admin_threads[i], NULL, handle_admin, &udp_sockfds[i]) != 0) {
+        if (pthread_create(&admin_threads[i], NULL, handle_admin, &admin_args) != 0) {
             perror("Error creating admin thread");
             exit(EXIT_FAILURE);
         }
@@ -61,10 +66,12 @@ int main() {
             continue;
         }
 
+        HandleClientArgs client_args = {conn_tcp, list_clients, list_topics};
+
         // Find an available slot for the client thread
         for (i = 0; i < MAX_CLIENTS; i++) {
             if (client_threads[i] == 0) {
-                if (pthread_create(&client_threads[i], NULL, handle_client, &conn_tcp) != 0) {
+                if (pthread_create(&client_threads[i], NULL, handle_client, &client_args) != 0) {
                     perror("error creating client thread");
                     close(conn_tcp);
                     break;
@@ -93,15 +100,21 @@ int main() {
 
 // Function to handle admin authentication
 void *handle_admin(void *arg) {
-    int udp_sockfd = *(int*)arg;
-    admin_authentication(udp_sockfd);
+    HandleAdminArgs* args = (HandleAdminArgs*) arg;
+    int udp_sockfd = args->udp_sockfd;
+    ClientList* list = args->list;
+    TopicList * list_top = args->list_top;
+    admin_authentication(udp_sockfd,list,list_top);
     return NULL;
 }
 
 // Function to handle client authentication
 void *handle_client(void *arg) {
-    int conn_tcp = *(int*)arg;
-    client_authentication(conn_tcp);
+    HandleClientArgs* args = (HandleClientArgs*) arg;
+    int conn_tcp = args->conn_tcp;
+    ClientList* list = args->list;
+    TopicList * list_top = args->list_top;
+    client_authentication(conn_tcp, list, list_top);
     close(conn_tcp);
     return NULL;
 }

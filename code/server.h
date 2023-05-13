@@ -2,17 +2,6 @@
 #define server  /* Include guard */
 
 //User libraries
-#include <stdio.h>
-#include <stdlib.h>
-#include <unistd.h>
-#include <string.h>
-#include <stdbool.h>
-#include <pthread.h>
-#include <sys/wait.h>
-#include <arpa/inet.h>
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
 #include "admin_functions.h"
 
 #define FIRST_UDP_PORT 5000
@@ -20,6 +9,18 @@
 #define MAX_CLIENTS 10
 #define PORT_TCP 5500
 #define MAXLINE 1024
+
+typedef struct {
+    int conn_tcp;
+    ClientList* list;
+    TopicList* list_top;
+} HandleClientArgs;
+
+typedef struct {
+    int udp_sockfd;
+    ClientList* list;
+    TopicList* list_top;
+} HandleAdminArgs;
 
 pthread_t admin_threads[NUM_ADMIN_THREADS];
 pthread_t client_threads[MAX_CLIENTS];
