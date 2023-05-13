@@ -13,6 +13,7 @@
 #include <unistd.h>
 #include <stdlib.h>
 #include <string.h>
+#include <signal.h>
 #include <stdio.h>
 
 #define MAXLINE 1024
@@ -20,97 +21,95 @@
 #define MAX_CLIENTS 10
 
 
-typedef struct client {
+typedef struct client_struct {
     char user_name[50];
-    char topics[MAX_TOPICS][512];
     int num_subscribed_topics;
     struct sockaddr_in address;
+    char topics[MAX_TOPICS][512];
     struct in_addr multicast_addresses[MAX_TOPICS][16];
-} Client;
+} client_struct;
 
-typedef struct client_node {
-    Client client;
-    struct client_node* next;
-} ClientNode;
+typedef struct clientNode {
+    client_struct client;
+    struct clientNode* next;
+} clientNode;
 
-typedef struct client_list {
-    ClientNode* head;
+typedef struct clientList {
+    clientNode* head;
     int size;
-} ClientList;
+} clientList;
 
-typedef struct topic {
-    struct sockaddr_in subscribed_clients[MAX_CLIENTS];
+typedef struct topic_struct {
+    char name[50];
     char multicast_address[16];
     int num_subscribed_clients;
-    char name[50];
-} Topic;
+    struct sockaddr_in subscribed_clients[MAX_CLIENTS];
+} topic_struct;
 
-typedef struct topic_node {
-    Topic topic;
-    struct topic_node* next;
-} TopicNode;
+typedef struct topicNode {
+    topic_struct topic;
+    struct topicNode* next;
+} topicNode;
 
-typedef struct topic_list {
-    TopicNode* head;
+typedef struct topicList {
+    topicNode* head;
     int size;
-} TopicList;
+} topicList;
 
 
-typedef struct news {
+typedef struct news_struct {
     char title[100];
     char content[1000];
     char timestamp[30];
-} News;
+} news_struct;
 
 sem_t file_semaphore;
 
 // admin_console operations
 void quitServer(int sockfd);
 void quitConsole(int sockfd);
-bool deleteUser(char* username);
-void handle_admin_console(int sockfd, ClientList *list, TopicList *list_top);
-bool addUser(char* username, char* password, char* userType);
-void listUsers(int sockfd, int slen, struct sockaddr_in cliaddr);
+bool deleteUser(char* username, char* file);
+void handle_admin_console(int sockfd, clientList *list, topicList *list_top, char* file);
+bool addUser(char* username, char* password, char* userType, char* file);
+void listUsers(int sockfd, int slen, struct sockaddr_in cliaddr, char* file);
 
 // authentication_methods
-char* authenticate_client(char *username, char *password);
-void admin_authentication(int sockfd, ClientList *list, TopicList *list_top);
-void client_authentication(int conn_tcp, ClientList *list, TopicList *list_top);
+char* authenticate_client(char *username, char *password, char* file);
+void admin_authentication(int sockfd, clientList *list, topicList *list_top, char* file);
+void client_authentication(int conn_tcp, clientList *list, topicList *list_top, char* file);
 
 // client_methods
-void handle_leitor_commands(int sockfd, ClientList *list, TopicList *list_top, Client *client);
-void handle_jornalista_commands(int sockfd, ClientList *list, TopicList *list_top, Client *client);
+void handle_leitor_commands(int sockfd, clientList *list, topicList *list_top, client_struct *client);
+void handle_jornalista_commands(int sockfd, clientList *list, topicList *list_top, client_struct *client);
 
 // Linked List Client functions
-ClientList* createClientList();
-void destroyClientList(ClientList* list);
-ClientNode* createClientNode(Client client);
+clientList* createClientList();
+void destroyClientList(clientList* list);
+clientNode* createClientNode(client_struct client);
 
-ClientList* readClientsFromFile();
-void writeClientListToFile(ClientList* list);
+clientList* readClientsFromFile();
+void writeClientListToFile(clientList* list);
 
-void addClient(ClientList* list, Client client);
-void removeClient(ClientList* client_list, TopicList* topic_list, char* username);
-Client getClientByName(struct sockaddr_in address, char *username, ClientList* list);
-struct sockaddr_in get_client_address_by_username(ClientList* client_list, char* username);
+void addClient(clientList* list, client_struct client);
+void removeClient(clientList* client_list, topicList* topic_list, char* username);
+client_struct getClient(struct sockaddr_in address, char *username, clientList* list);
+struct sockaddr_in getClientAddress(clientList* client_list, char* username);
 
-void printClientList(ClientList* list);
+void printClientList(clientList* list);
 
 // LInked List Topic functions
-TopicList* newTopicList();
-void destroyTopicList(TopicList* topicList);
+topicList* newTopicList();
+void destroyTopicList(topicList* topic_List);
 
-TopicList* readTopicsFromFile();
-void writeTopicListToFile(TopicList* topicList);
+topicList* readTopicsFromFile();
+void writeTopicListToFile(topicList* topicList);
 
-void addTopic(TopicList* topicList, Topic newTopic);
-void removeTopic(TopicList* topicList, char* topicName);
-Topic* getTopicByName(TopicList* topicList, const char* name);
+void addTopic(topicList* topic_List, topic_struct newTopic);
+void removeTopic(topicList* topicList, char* topicName);
+topic_struct* getTopic(topicList* topic_List, const char* name);
 
-void printTopics(TopicList* topicList);
-void receive_news_from_multicast(Client *client);
-int isSubscribed(char **topics, int num_topics, char *topic);
-void subscribe_topic(TopicList *list_top, Client *client, char* name);
+void printTopics(topicList* topicList);
+void subscribeTopic(topicList *list_top, client_struct *client, char* name);
 
 // system_methods
 void erro(char *s);

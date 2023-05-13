@@ -1,17 +1,28 @@
 #include "server.h"
 
 // Driver code
-int main() {
+int main(int argc, char *argv[]) {
 
-    ClientList* list_clients = readClientsFromFile();
-    TopicList* list_topics = readTopicsFromFile();
+    signal(SIGINT, SIG_IGN);
+
+     if (argc != 3) {
+        printf("Usage: {PORTO_NOTICIAS} {PORTO_CONFIG} {ficheiro configuração}\n");
+        exit(1);
+    }
+
+    int PORTO_NOTICIAS = atoi(argv[1]);
+    int PORTO_CONFIG = atoi(argv[2]);
+    char *file_config = argv[3];
+
+    list_clients = readClientsFromFile();
+    list_topics = readTopicsFromFile();
 
     struct sockaddr_in servaddr_udp, servaddr_tcp, cliaddr_tcp;
     socklen_t len_tcp = sizeof(cliaddr_tcp);
     int udp_sockfds[NUM_ADMIN_THREADS];
     int tcp_sockfd, conn_tcp, udp_port, i;
 
-    for (i = 0, udp_port = FIRST_UDP_PORT; i < NUM_ADMIN_THREADS; i++, udp_port++) {
+    for (i = 0, udp_port = PORTO_CONFIG; i < NUM_ADMIN_THREADS; i++, udp_port++) {
 
         if ((udp_sockfds[i] = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)) == -1) {
             perror("Error creating UDP socket");
@@ -29,7 +40,7 @@ int main() {
             exit(EXIT_FAILURE);
         }
 
-        HandleAdminArgs admin_args = {udp_sockfds[i],list_clients, list_topics};
+        HandleAdminArgs admin_args = {udp_sockfds[i],list_clients, list_topics, file_config};
 
         // Start admin authentication thread
         if (pthread_create(&admin_threads[i], NULL, handle_admin, &admin_args) != 0) {
@@ -46,7 +57,7 @@ int main() {
     // Filling server information
     servaddr_tcp.sin_family = AF_INET;
     servaddr_tcp.sin_addr.s_addr = INADDR_ANY;
-    servaddr_tcp.sin_port = htons(PORT_TCP);
+    servaddr_tcp.sin_port = htons(PORTO_NOTICIAS);
 
      // Bind TCP socket to address
     if (bind(tcp_sockfd, (struct sockaddr*)&servaddr_tcp, sizeof(servaddr_tcp)) == -1) {
@@ -58,6 +69,8 @@ int main() {
         erro("Erro no listen do socket");
     }
 
+    signal(SIGINT, cleanup);
+
     // Handle client connections
     while (1) {
 
@@ -66,7 +79,7 @@ int main() {
             continue;
         }
 
-        HandleClientArgs client_args = {conn_tcp, list_clients, list_topics};
+        HandleClientArgs client_args = {conn_tcp, list_clients, list_topics, file_config};
 
         // Find an available slot for the client thread
         for (i = 0; i < MAX_CLIENTS; i++) {
@@ -102,9 +115,10 @@ int main() {
 void *handle_admin(void *arg) {
     HandleAdminArgs* args = (HandleAdminArgs*) arg;
     int udp_sockfd = args->udp_sockfd;
-    ClientList* list = args->list;
-    TopicList * list_top = args->list_top;
-    admin_authentication(udp_sockfd,list,list_top);
+    clientList* list = args->list;
+    topicList * list_top = args->list_top;
+    char* file = args->file_config;
+    admin_authentication(udp_sockfd,list,list_top,file);
     return NULL;
 }
 
@@ -112,9 +126,26 @@ void *handle_admin(void *arg) {
 void *handle_client(void *arg) {
     HandleClientArgs* args = (HandleClientArgs*) arg;
     int conn_tcp = args->conn_tcp;
-    ClientList* list = args->list;
-    TopicList * list_top = args->list_top;
-    client_authentication(conn_tcp, list, list_top);
+    clientList* list = args->list;
+    topicList * list_top = args->list_top;
+    char* file = args->file_config;
+    client_authentication(conn_tcp, list, list_top,file);
     close(conn_tcp);
     return NULL;
+}
+
+void cleanup(int sig){
+    printf("SYSTEM EXITING\n");
+    
+    for (int i = 0; i < MAX_CLIENTS; i++) {
+        if (client_threads[i] != 0) {
+            pthread_cancel(client_threads[i]);
+        }
+    }
+    for (int i = 0; i < NUM_ADMIN_THREADS; i++) {
+        pthread_cancel(admin_threads[i]);
+    }
+
+    destroyClientList(list_clients);
+    destroyTopicList(list_topics); 
 }
