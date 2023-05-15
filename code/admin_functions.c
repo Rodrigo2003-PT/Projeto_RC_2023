@@ -1,6 +1,8 @@
 #include "admin_functions.h"
 
-pthread_mutex_t clients_mutex = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t topic_mutex = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t client_mutex = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t admin_file_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 void handle_admin_console(int sockfd, clientList *list, topicList *list_top, char* file){
 
@@ -8,8 +10,6 @@ void handle_admin_console(int sockfd, clientList *list, topicList *list_top, cha
     char buffer[MAXLINE];
     struct sockaddr_in cliaddr;
     socklen_t slen = sizeof(cliaddr);
-
-    sem_init(&file_semaphore, 0, 1);
 
     while (1) {
 
@@ -27,7 +27,7 @@ void handle_admin_console(int sockfd, clientList *list, topicList *list_top, cha
             char* password = strtok(NULL, " ");
             char* userType = strtok(NULL, " \n");
 
-            sem_wait(&file_semaphore);
+            pthread_mutex_lock(&admin_file_mutex);
 
             if (addUser(username, password, userType, file)) {
                 sendto(sockfd, "user added successfully\n", strlen("user added successfully\n"), MSG_CONFIRM, (const struct sockaddr *)&cliaddr, slen);
@@ -35,30 +35,28 @@ void handle_admin_console(int sockfd, clientList *list, topicList *list_top, cha
                 sendto(sockfd, "failed to add user\n", strlen("failed to add user\n"), MSG_CONFIRM, (const struct sockaddr *)&cliaddr, slen);
                 }
             
-            sem_post(&file_semaphore);
+            pthread_mutex_unlock(&admin_file_mutex);
         } 
         else if (strcmp(token, "DEL") == 0) {
 
             char* username = strtok(NULL, " \n");
 
-            sem_wait(&file_semaphore);
+            pthread_mutex_lock(&admin_file_mutex);
 
             if (deleteUser(username, file)) {
                 removeClient(list,list_top,username);
-                writeClientListToFile(list);
-                writeTopicListToFile(list_top);
                 sendto(sockfd, "user deleted successfully\n", strlen("user deleted successfully\n"), MSG_CONFIRM, (const struct sockaddr *)&cliaddr, slen);
             }
             else {
                 sendto(sockfd, "failed to delete user\n", strlen("failed to delete user\n"), MSG_CONFIRM, (const struct sockaddr *)&cliaddr, slen);
             }
 
-            sem_post(&file_semaphore);
+            pthread_mutex_unlock(&admin_file_mutex);
         } 
         else if (strcmp(token, "LIST\n") == 0) {
-            sem_wait(&file_semaphore);
+            pthread_mutex_lock(&admin_file_mutex);
             listUsers(sockfd,slen,cliaddr,file);
-            sem_post(&file_semaphore);
+            pthread_mutex_unlock(&admin_file_mutex);
         }
         else if (strcmp(token, "QUIT\n") == 0) {
             quitConsole(sockfd);
@@ -89,6 +87,8 @@ void handle_leitor_commands(int sockfd, clientList *list, topicList *list_top, c
         token = strtok(buffer, " \n");
 
         if (strcmp(token, "LIST_TOPICS") == 0) {
+
+            pthread_mutex_lock(&topic_mutex);
             topicNode *cur_topic = list_top->head;
             char topic_str[MAXLINE] = "";
 
@@ -97,16 +97,16 @@ void handle_leitor_commands(int sockfd, clientList *list, topicList *list_top, c
                 strcat(topic_str, "\n");
                 cur_topic = cur_topic->next;
             }
+            pthread_mutex_unlock(&topic_mutex);
+
             if (send(sockfd, topic_str, strlen(topic_str), 0) == -1) {
                 perror("Error sending message to client");
                 exit(EXIT_FAILURE);
             }
         } 
         else if (strcmp(token, "SUBSCRIBE_TOPIC") == 0) {
-            // Parse topic_id
             token = strtok(NULL, " \n");
-            // Subscribe to topic
-            subscribeTopic(list_top,client,token);
+            subscribeTopic(list_top,client,token,sockfd);
         }
         else {
             // Invalid command
@@ -118,7 +118,6 @@ void handle_leitor_commands(int sockfd, clientList *list, topicList *list_top, c
     }
 }
 
-//TO-DO -> INTEGRAL IMPLEMENTATION
 void handle_jornalista_commands(int sockfd, clientList *list, topicList *list_top, client_struct *client){
     char* token;
     char buffer[MAXLINE];
@@ -134,14 +133,17 @@ void handle_jornalista_commands(int sockfd, clientList *list, topicList *list_to
         token = strtok(buffer, " \n");
 
         if (strcmp(token, "LIST_TOPICS") == 0) {
+
+            pthread_mutex_lock(&topic_mutex);
             topicNode *cur_topic = list_top->head;
             char topic_str[MAXLINE] = "";
-
             while (cur_topic != NULL) {
                 strcat(topic_str, cur_topic->topic.name);
                 strcat(topic_str, "\n");
                 cur_topic = cur_topic->next;
             }
+            pthread_mutex_unlock(&topic_mutex);
+
             if (send(sockfd, topic_str, strlen(topic_str), 0) == -1) {
                 perror("Error sending message to client");
                 exit(EXIT_FAILURE);
@@ -149,17 +151,21 @@ void handle_jornalista_commands(int sockfd, clientList *list, topicList *list_to
         } 
         else if (strcmp(token, "SUBSCRIBE_TOPIC") == 0) {
             token = strtok(NULL, " \n");
-            subscribeTopic(list_top,client,token);
+            subscribeTopic(list_top,client,token,sockfd);
         }
         else if(strcmp(token, "CREATE_TOPIC") == 0){
             char* multicast_id = strtok(NULL, " \n");
             char* topic_title = strtok(NULL, "\n");
+            
             topic_struct new_topic;
             strcpy(new_topic.name,topic_title);
             strcpy(new_topic.multicast_address, multicast_id);
             memset(new_topic.subscribed_clients, 0, sizeof(new_topic.subscribed_clients));
             new_topic.num_subscribed_clients = 0;
+
+            pthread_mutex_lock(&topic_mutex);
             addTopic(list_top,new_topic);
+            pthread_mutex_unlock(&topic_mutex);
 
             // Send a confirmation message to the client
             char msg[MAXLINE];
@@ -169,7 +175,6 @@ void handle_jornalista_commands(int sockfd, clientList *list, topicList *list_to
                 exit(EXIT_FAILURE);
             }
         }
-
         else {
             // Invalid command
             if (send(sockfd, "Invalid command\n", 17, 0) == -1) {
@@ -250,7 +255,7 @@ void client_authentication(int sockfd, clientList *list, topicList *list_top, ch
                 return;
             }
 
-            client = getClient(client_address, username, list);
+            client = createClient(client_address, username, list);
 
             if (strcmp(token, "leitor") == 0) {
                 handle_leitor_commands(sockfd, list, list_top, &client);
@@ -273,6 +278,7 @@ char* authenticate_client(char *username, char *password, char* file) {
     FILE *fp;
 
     // Open file for reading
+    pthread_mutex_lock(&admin_file_mutex);
     fp = fopen(file, "r");
     if (fp == NULL) {
         perror("Error opening file");
@@ -298,6 +304,7 @@ char* authenticate_client(char *username, char *password, char* file) {
     }
 
     fclose(fp);
+    pthread_mutex_unlock(&admin_file_mutex);
     return NULL; // Authentication failed
 }
 
@@ -438,16 +445,14 @@ void listUsers(int sockfd, int slen, struct sockaddr_in cliaddr, char* file) {
 // Function to handle QUIT command
 void quitConsole(int sockfd) {
     printf("Admin console session ended.\n");
-    sem_destroy(&file_semaphore);
     close(sockfd);
 }
 
 // Function to handle QUIT_SERVER command
 void quitServer(int sockfd) {
     printf("Server shutting down.\n");
-    sem_destroy(&file_semaphore);
-    exit(EXIT_SUCCESS);
     close(sockfd);
+    exit(EXIT_SUCCESS);
 }
 
 void erro(char *s) {
@@ -506,6 +511,7 @@ void removeClient(clientList* client_list, topicList* topic_list, char *username
     clientNode* curr_client = client_list->head;
     clientNode* prev_client = NULL;
 
+    pthread_mutex_lock(&client_mutex);
     struct sockaddr_in address = getClientAddress(client_list, username);
 
     while (curr_client != NULL) {
@@ -522,7 +528,9 @@ void removeClient(clientList* client_list, topicList* topic_list, char *username
         prev_client = curr_client;
         curr_client = curr_client->next;
     }
+    pthread_mutex_unlock(&client_mutex);
 
+    pthread_mutex_lock(&topic_mutex);
     // Remove client from topic subscriber lists
     topicNode* curr_topic = topic_list->head;
     while (curr_topic != NULL) {
@@ -539,6 +547,7 @@ void removeClient(clientList* client_list, topicList* topic_list, char *username
         }
         curr_topic = curr_topic->next;
     }
+    pthread_mutex_unlock(&topic_mutex);
 }
 
 struct sockaddr_in getClientAddress(clientList* client_list, char* username) {
@@ -564,105 +573,23 @@ void destroyClientList(clientList* list) {
     list->size = 0;
 }
 
-void writeClientListToFile(clientList* list) {
-    FILE* file = fopen("clients.dat", "wb");
-    if (file == NULL) {
-        perror("Error opening file");
-        exit(EXIT_FAILURE);
-    }
-
-    clientNode* current = list->head;
-    while (current != NULL) {
-        fwrite(&current->client, sizeof(client_struct), 1, file);
-        current = current->next;
-    }
-
-    fclose(file);
-}
-
-clientList* readClientsFromFile() {
- 
-    client_struct tempClient;
-    clientList* list = createClientList();
-    FILE* file = fopen("clients.dat", "rb");
-
-    if (file == NULL) {
-        return list;
-    }
-
-    // Check if the file is empty
-    fseek(file, 0, SEEK_END);
-    long fileSize = ftell(file);
-    if (fileSize == 0) {
-        fclose(file);
-        return list;
-    }
-
-    // Reset file position to beginning
-    fseek(file, 0, SEEK_SET);
-
-    while (fread(&tempClient, sizeof(client_struct), 1, file) == 1) {
-        clientNode* newNode = (clientNode*)malloc(sizeof(clientNode));
-        if (newNode == NULL) {
-            perror("Error allocating memory");
-            exit(EXIT_FAILURE);
-        }
-
-        // Copy the client information to the new node
-        newNode->client = tempClient;
-
-        // Add the new node to the end of the linked list
-        newNode->next = NULL;
-
-        if (list->head == NULL) {
-            list->head = newNode;
-        } 
-        else{
-            clientNode* current = list->head;
-            while (current->next != NULL)
-                current = current->next;
-            current->next = newNode;
-        }
-    }
-
-    fclose(file);
-    return list;
-}
-
-client_struct getClient(struct sockaddr_in address, char *username, clientList* list) {
-    FILE* file = fopen("clients.dat", "rb");
-
-    if (file == NULL) {
-        perror("Error opening file");
-        exit(EXIT_FAILURE);
-    }
+client_struct createClient(struct sockaddr_in address, char *username, clientList* list) {
 
     client_struct client;
-    while (fread(&client, sizeof(client), 1, file)) {
-        if (memcmp(&address, &client.address, sizeof(struct sockaddr_in)) == 0) {
-            fclose(file);
-            return client;
-        }
-    }
-
-    fclose(file);
-    // If no matching client is found, return a default initialized client with address value set to address and other fields set to default values
     strcpy(client.user_name, username);
     client.address = address;
     client.num_subscribed_topics = 0;
     memset(client.topics, 0, sizeof(client.topics));
     memset(client.multicast_addresses, 0, sizeof(client.multicast_addresses));
-    pthread_mutex_lock(&clients_mutex);
+    pthread_mutex_lock(&client_mutex);
     addClient(list, client);
-    writeClientListToFile(list);
-    pthread_mutex_unlock(&clients_mutex);
-
+    pthread_mutex_unlock(&client_mutex);
     return client;
 }
 
 void printClientList(clientList* list) {
+    pthread_mutex_lock(&client_mutex);
     clientNode* current = list->head;
-
     printf("Client List:\n");
     printf("------------\n");
     while (current != NULL) {
@@ -688,6 +615,7 @@ void printClientList(clientList* list) {
         printf("\n\n");
         current = current->next;
     }
+    pthread_mutex_unlock(&client_mutex);
 }
 
 topicList* newTopicList() {
@@ -764,69 +692,6 @@ void removeTopic(topicList* list, char* topic_name) {
     list->size--;
 }
 
-void writeTopicListToFile(topicList* list) {
-    FILE* file = fopen("topics.dat", "wb");
-    if (file == NULL) {
-        perror("Error opening file");
-        exit(EXIT_FAILURE);
-    }
-
-    topicNode* current = list->head;
-    while (current != NULL) {
-        fwrite(&current->topic, sizeof(topic_struct), 1, file);
-        current = current->next;
-    }
-
-    fclose(file);
-}
-
-topicList* readTopicsFromFile() {
-    topic_struct tempTopic;
-    topicList* list = newTopicList();
-    FILE* file = fopen("topics.dat", "rb");
-
-    if (file == NULL) {
-        return list;
-    }
-
-    // Check if the file is empty
-    fseek(file, 0, SEEK_END);
-    long fileSize = ftell(file);
-    if (fileSize == 0) {
-        fclose(file);
-        return list;
-    }
-
-    // Reset file position to beginning
-    fseek(file, 0, SEEK_SET);
-
-    while (fread(&tempTopic, sizeof(topic_struct), 1, file) == 1) {
-        topicNode* newNode = (topicNode*)malloc(sizeof(topicNode));
-        if (newNode == NULL) {
-            perror("Error allocating memory");
-            exit(EXIT_FAILURE);
-        }
-
-        // Copy the topic information to the new node
-        newNode->topic = tempTopic;
-
-        // Add the new node to the end of the linked list
-        newNode->next = NULL;
-
-        if (list->head == NULL) {
-            list->head = newNode;
-        } else {
-            topicNode* current = list->head;
-            while (current->next != NULL)
-                current = current->next;
-            current->next = newNode;
-        }
-    }
-
-    fclose(file);
-    return list;
-}
-
 
 topic_struct* getTopic(topicList* topic_List, const char* name) {
     topicNode* currentNode = topic_List->head;
@@ -840,6 +705,7 @@ topic_struct* getTopic(topicList* topic_List, const char* name) {
 }
 
 void printTopics(topicList* list) {
+    pthread_mutex_lock(&topic_mutex);
     printf("List of topics:\n");
     printf("----------------\n");
 
@@ -866,18 +732,18 @@ void printTopics(topicList* list) {
             i++;
         }
     }
+    pthread_mutex_unlock(&topic_mutex);
 }
 
-void subscribeTopic(topicList *list_top, client_struct *client, char* name) {
+void subscribeTopic(topicList *list_top, client_struct *client, char* name, int sockfd) {
 
+    pthread_mutex_lock(&topic_mutex);
     topic_struct *topic = getTopic(list_top, name);
-
     if (topic == NULL) {
         // Topic not found
         printf("Topic '%s' not found\n", name);
         return;
     }
-    
     // Add client to the topic's list of subscribed clients
     if (topic->num_subscribed_clients >= MAX_CLIENTS) {
         printf("Topic %s already has maximum number of subscribers.\n", topic->name);
@@ -885,7 +751,10 @@ void subscribeTopic(topicList *list_top, client_struct *client, char* name) {
     }
     topic->subscribed_clients[topic->num_subscribed_clients] = client->address;
     topic->num_subscribed_clients++;
-    
+    pthread_mutex_unlock(&topic_mutex);
+
+
+    pthread_mutex_lock(&client_mutex);
     // Add the topic to the client's list of subscribed topics
     if (client->num_subscribed_topics >= MAX_TOPICS) {
         printf("Client already subscribed to maximum number of topics.\n");
@@ -893,10 +762,16 @@ void subscribeTopic(topicList *list_top, client_struct *client, char* name) {
     }
     strcpy(client->topics[client->num_subscribed_topics], name);
     client->num_subscribed_topics++;
-    
     // Add the topic's multicast address to the client's list of multicast addresses
     if (inet_aton(topic->multicast_address, &client->multicast_addresses[client->num_subscribed_topics-1][0]) == 0) {
         perror("Error converting multicast address to network format");
+        return;
+    }
+    pthread_mutex_unlock(&client_mutex);
+
+    // Send the multicast address to the client
+    if (send(sockfd, topic->multicast_address, strlen(topic->multicast_address), 0) == -1) {
+        perror("Error sending multicast address to client");
         return;
     }
 }

@@ -5,7 +5,7 @@ int main(int argc, char *argv[]) {
 
     signal(SIGINT, SIG_IGN);
 
-     if (argc != 3) {
+    if (argc != 3) {
         printf("Usage: {PORTO_NOTICIAS} {PORTO_CONFIG} {ficheiro configuração}\n");
         exit(1);
     }
@@ -14,8 +14,8 @@ int main(int argc, char *argv[]) {
     int PORTO_CONFIG = atoi(argv[2]);
     char *file_config = argv[3];
 
-    list_clients = readClientsFromFile();
-    list_topics = readTopicsFromFile();
+    list_clients = createClientList();
+    list_topics = newTopicList();
 
     struct sockaddr_in servaddr_udp, servaddr_tcp, cliaddr_tcp;
     socklen_t len_tcp = sizeof(cliaddr_tcp);

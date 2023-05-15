@@ -15,6 +15,7 @@
 #include <string.h>
 #include <signal.h>
 #include <stdio.h>
+#include <fcntl.h>
 
 #define MAXLINE 1024
 #define MAX_TOPICS 10
@@ -63,8 +64,6 @@ typedef struct news_struct {
     char timestamp[30];
 } news_struct;
 
-sem_t file_semaphore;
-
 // admin_console operations
 void quitServer(int sockfd);
 void quitConsole(int sockfd);
@@ -87,12 +86,9 @@ clientList* createClientList();
 void destroyClientList(clientList* list);
 clientNode* createClientNode(client_struct client);
 
-clientList* readClientsFromFile();
-void writeClientListToFile(clientList* list);
-
 void addClient(clientList* list, client_struct client);
 void removeClient(clientList* client_list, topicList* topic_list, char* username);
-client_struct getClient(struct sockaddr_in address, char *username, clientList* list);
+client_struct createClient(struct sockaddr_in address, char *username, clientList* list);
 struct sockaddr_in getClientAddress(clientList* client_list, char* username);
 
 void printClientList(clientList* list);
@@ -101,15 +97,12 @@ void printClientList(clientList* list);
 topicList* newTopicList();
 void destroyTopicList(topicList* topic_List);
 
-topicList* readTopicsFromFile();
-void writeTopicListToFile(topicList* topicList);
-
 void addTopic(topicList* topic_List, topic_struct newTopic);
 void removeTopic(topicList* topicList, char* topicName);
 topic_struct* getTopic(topicList* topic_List, const char* name);
 
 void printTopics(topicList* topicList);
-void subscribeTopic(topicList *list_top, client_struct *client, char* name);
+void subscribeTopic(topicList *list_top, client_struct *client, char* name, int sockfd);
 
 // system_methods
 void erro(char *s);
