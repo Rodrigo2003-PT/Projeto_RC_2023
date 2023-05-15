@@ -1,7 +1,6 @@
 #ifndef admin_functions
 #define admin_functions  /* Include guard */
 
-
 #include <netinet/in.h>
 #include <sys/socket.h>
 #include <semaphore.h>
@@ -100,6 +99,8 @@ void destroyTopicList(topicList* topic_List);
 void addTopic(topicList* topic_List, topic_struct newTopic);
 void removeTopic(topicList* topicList, char* topicName);
 topic_struct* getTopic(topicList* topic_List, const char* name);
+bool existsNameTopic(topicList* topic_List, const char* name);
+bool existsMulticastTopic(topicList* topic_List, const char* multicast);
 
 void printTopics(topicList* topicList);
 void subscribeTopic(topicList *list_top, client_struct *client, char* name, int sockfd);

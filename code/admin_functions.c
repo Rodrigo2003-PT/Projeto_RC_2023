@@ -175,6 +175,19 @@ void handle_jornalista_commands(int sockfd, clientList *list, topicList *list_to
                 exit(EXIT_FAILURE);
             }
         }
+        else if(strcmp(token,"SEND_NEWS") == 0){
+            char* multicast_id = strtok(NULL, " \n");
+            char* topic_title = strtok(NULL, "\n");
+
+            if(existsMulticastTopic(list_top,multicast_id) && existsNameTopic(list_top, topic_title)){
+                char msg[MAXLINE];
+                strcpy(msg,"VALIDATION SUCCESSFUL\n");
+                if (send(sockfd, msg, strlen(msg), 0) == -1) {
+                    perror("Error sending message to client");
+                    exit(EXIT_FAILURE);
+                }
+            }
+        }
         else {
             // Invalid command
             if (send(sockfd, "Invalid command\n", 17, 0) == -1) {
@@ -692,7 +705,6 @@ void removeTopic(topicList* list, char* topic_name) {
     list->size--;
 }
 
-
 topic_struct* getTopic(topicList* topic_List, const char* name) {
     topicNode* currentNode = topic_List->head;
     while (currentNode != NULL) {
@@ -702,6 +714,28 @@ topic_struct* getTopic(topicList* topic_List, const char* name) {
         currentNode = currentNode->next;
     }
     return NULL;
+}
+
+bool existsNameTopic(topicList* topic_List, const char* name){
+    topicNode* currentNode = topic_List->head;
+    while (currentNode != NULL) {
+        if (strcmp(currentNode->topic.name, name) == 0) {
+            return true;
+        }
+        currentNode = currentNode->next;
+    }
+    return false;
+}
+
+bool existsMulticastTopic(topicList* topic_List, const char* multicast){
+    topicNode* currentNode = topic_List->head;
+    while (currentNode != NULL) {
+        if (strcmp(currentNode->topic.multicast_address, multicast) == 0) {
+            return true;
+        }
+        currentNode = currentNode->next;
+    }
+    return false;
 }
 
 void printTopics(topicList* list) {
