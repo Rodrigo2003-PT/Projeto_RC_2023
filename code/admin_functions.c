@@ -176,12 +176,12 @@ void handle_jornalista_commands(int sockfd, clientList *list, topicList *list_to
             }
         }
         else if(strcmp(token,"SEND_NEWS") == 0){
-            char* multicast_id = strtok(NULL, " \n");
-            char* topic_title = strtok(NULL, "\n");
+            char* multicast_id = strtok(NULL," ");
+            char* message = strtok(NULL,"\n");
 
-            if(existsMulticastTopic(list_top,multicast_id) && existsNameTopic(list_top, topic_title)){
+            if(existsMulticastTopic(list_top,multicast_id)){
                 char msg[MAXLINE];
-                strcpy(msg,"VALIDATION SUCCESSFUL\n");
+                snprintf(msg, MAXLINE, "SUCCESSFUL %s\n", message);
                 if (send(sockfd, msg, strlen(msg), 0) == -1) {
                     perror("Error sending message to client");
                     exit(EXIT_FAILURE);
@@ -237,6 +237,7 @@ void client_authentication(int sockfd, clientList *list, topicList *list_top, ch
 
     char* token;
     int recv_len;
+    char* result = NULL;
     client_struct client;
     char buffer[MAXLINE];
     bool authenticated = false;
@@ -258,9 +259,10 @@ void client_authentication(int sockfd, clientList *list, topicList *list_top, ch
         char* password = strtok(NULL, " \n");
 
         // Verify credentials
-        if ((token = authenticate_client(username,password,file)) != NULL) {
+        if ((token = authenticate_client(username,password,file,result)) != NULL) {
             authenticated = true;
-            send(sockfd, "authentication successful\n", strlen("authentication successful\n"), 0);
+            free(result);
+            send(sockfd, "authentication_successful\n", strlen("authentication_successful\n"), 0);
 
             if(getpeername(sockfd, (struct sockaddr *)&client_address, &client_address_len) == -1){
                 printf("Error getting client address\n");
@@ -284,7 +286,7 @@ void client_authentication(int sockfd, clientList *list, topicList *list_top, ch
     }
 };
 
-char* authenticate_client(char *username, char *password, char* file) {
+char* authenticate_client(char *username, char *password, char* file, char* result) {
 
     char line[MAXLINE];
     char *token;
@@ -310,10 +312,12 @@ char* authenticate_client(char *username, char *password, char* file) {
         if (strcmp(token, password) != 0) continue; // Skip if password does not match
 
         // Get user type
-        token = strtok(NULL, ";");
+        token = strtok(NULL, "\n");
+        result = strdup(token);
 
         fclose(fp);
-        return token; // Authentication successful
+        pthread_mutex_unlock(&admin_file_mutex);
+        return result; // Authentication successful
     }
 
     fclose(fp);
@@ -714,17 +718,6 @@ topic_struct* getTopic(topicList* topic_List, const char* name) {
         currentNode = currentNode->next;
     }
     return NULL;
-}
-
-bool existsNameTopic(topicList* topic_List, const char* name){
-    topicNode* currentNode = topic_List->head;
-    while (currentNode != NULL) {
-        if (strcmp(currentNode->topic.name, name) == 0) {
-            return true;
-        }
-        currentNode = currentNode->next;
-    }
-    return false;
 }
 
 bool existsMulticastTopic(topicList* topic_List, const char* multicast){

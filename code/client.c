@@ -1,10 +1,12 @@
 #include "client.h"
 
+bool auth = false;
+
 int main(int argc, char *argv[]) {
 
     // Initialization code here
-    if (argc != 2) {
-        printf("Usage: {Endereço_Servidor} {PORTO_NOTICIAS}\n");
+    if (argc != 3) {
+        printf("Usage: %s {Endereço_Servidor} {PORTO_NOTICIAS}\n",argv[0]);
         exit(1);
     }
 
@@ -27,6 +29,7 @@ int main(int argc, char *argv[]) {
 void *server_handler(void *arg) {
     int sockfd;
     char buffer[MAXLINE];
+    char recv_buffer[MAXLINE];
     struct sockaddr_in serv_addr;
 
     if ((sockfd = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
@@ -41,7 +44,29 @@ void *server_handler(void *arg) {
         erro("ERROR connecting to server");
     }
 
+    while(!auth){
+        bzero(recv_buffer,MAXLINE);
+        bzero(buffer, MAXLINE);
+        fgets(buffer, MAXLINE - 1, stdin);
+        
+        buffer[strcspn(buffer, "\n")] = 0;
+        if (send(sockfd, buffer, MAXLINE, 0) == -1) {
+            perror("Error sending message to server\n");
+            exit(EXIT_FAILURE);
+        }
+        if (recv(sockfd, recv_buffer, MAXLINE, 0) == -1) {
+            perror("Error receiving command from server");
+            exit(EXIT_FAILURE);
+        }
+        char *token= strtok(recv_buffer, " \n");
+
+        if (strcmp(token,"authentication_successful") == 0){
+            auth = true;
+        }
+    }
+
     while (1) {
+        bzero(recv_buffer,MAXLINE);
         bzero(buffer, MAXLINE);
         fgets(buffer, MAXLINE - 1, stdin);
         buffer[strcspn(buffer, "\n")] = 0;
@@ -58,14 +83,14 @@ void *server_handler(void *arg) {
                 perror("Error sending message to server\n");
                 exit(EXIT_FAILURE);
             }
-            char recv_buffer[MAXLINE];
             if (recv(sockfd, recv_buffer, MAXLINE, 0) == -1) {
                 perror("Error receiving command from server");
                 exit(EXIT_FAILURE);
             }
 
             char *multicast_address = strtok(recv_buffer, " \n");
-            HandleMulticastArgs args = {multicast_port,multicast_address};
+
+            HandleMulticastArgs args = {multicast_port, strdup(multicast_address), sockfd};
 
             for(int i = 0; i < MAX_TOPICS; i++){
                 for(int j = 0; j < 2; j++){
@@ -91,12 +116,22 @@ void *server_handler(void *arg) {
                 perror("Error sending message to server\n");
                 exit(EXIT_FAILURE);
             }
+            if (recv(sockfd, recv_buffer, MAXLINE, 0) == -1) {
+                perror("Error receiving command from server");
+                exit(EXIT_FAILURE);
+            }
+            printf("%s",recv_buffer);
         }
         else if(strcmp(token,"CREATE_TOPIC") == 0){
              if (send(sockfd, buffer, MAXLINE, 0) == -1) {
                 perror("Error sending message to server\n");
                 exit(EXIT_FAILURE);
             }
+            if (recv(sockfd, recv_buffer, MAXLINE, 0) == -1) {
+                perror("Error receiving command from server");
+                exit(EXIT_FAILURE);
+            }
+            printf("%s",recv_buffer);
         }
         else if(strcmp(token,"SEND_NEWS") == 0){
             if (send(sockfd, buffer, MAXLINE, 0) == -1) {
@@ -118,7 +153,8 @@ void *server_handler(void *arg) {
 void *multicast_sender_handler(void *arg) {
     HandleMulticastArgs* args = (HandleMulticastArgs*) arg;
     int port = args->multicast_port;
-    char *address = args->multicast_address;
+    char* address = strdup(args->multicast_address);
+    int tcp_sock = args->sockfd;
 
     // Create a UDP socket
     int sockfd = socket(AF_INET, SOCK_DGRAM, 0);
@@ -134,22 +170,28 @@ void *multicast_sender_handler(void *arg) {
     multicast_addr.sin_port = htons(port);
     multicast_addr.sin_addr.s_addr = inet_addr(address);
 
+    // enable multicast on the socket
+    int enable = 1;
+    if (setsockopt(sockfd, IPPROTO_IP, IP_MULTICAST_TTL, &enable, sizeof(enable)) < 0) {
+        perror("setsockopt");
+        exit(1);
+    }
+
+    free(address);
+
     while(1){
+        printf("HERE_50\n");
         char recv_buffer[MAXLINE];
-        if (recv(sockfd, recv_buffer, MAXLINE, 0) == -1) {
+        if (recv(tcp_sock, recv_buffer, MAXLINE, 0) == -1) {
             perror("Error receiving command from server");
             exit(EXIT_FAILURE);
         }
-        char *token= strtok(recv_buffer, " \n");
+        char *token= strtok(recv_buffer, " ");
 
-        if (strcmp(token,"VALIDATION SUCCESSFUL") == 0){
-            char message[MAXLINE];
-            printf("SENDER_PROMPT: ");
-            fgets(message, MAXLINE, stdin);
-            message[strcspn(message, "\n")] = '\0';
-
+        if (strcmp(token,"SUCCESSFUL") == 0){
+            token = strtok(NULL,"\n");
             // Send the message to the multicast group
-            if (sendto(sockfd, message, strlen(message), 0, (struct sockaddr *)&multicast_addr, sizeof(multicast_addr)) < 0) {
+            if (sendto(sockfd, token, strlen(token), 0, (struct sockaddr *)&multicast_addr, sizeof(multicast_addr)) < 0) {
                 perror("Error sending multicast message");
                 break;
             }
@@ -162,12 +204,20 @@ void *multicast_sender_handler(void *arg) {
 void *multicast_receiver_handler(void *arg){
     HandleMulticastArgs* args = (HandleMulticastArgs*) arg;
     int port = args->multicast_port;
-    char *address = args->multicast_address;
+    char* address = strdup(args->multicast_address);
 
     // Create a UDP socket
     int sockfd = socket(AF_INET, SOCK_DGRAM, 0);
     if (sockfd < 0) {
         perror("Error opening socket");
+        pthread_exit(NULL);
+    }
+
+    // Set the SO_REUSEADDR option
+    int reuse = 1;
+    if (setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &reuse, sizeof(reuse)) < 0) {
+        perror("Error setting socket option");
+        close(sockfd);
         pthread_exit(NULL);
     }
 
@@ -189,11 +239,13 @@ void *multicast_receiver_handler(void *arg){
     struct ip_mreq multicast_req;
     multicast_req.imr_multiaddr.s_addr = inet_addr(address);
     multicast_req.imr_interface.s_addr = htonl(INADDR_ANY);
-    if (setsockopt(sockfd, IPPROTO_IP, IP_ADD_MEMBERSHIP, (char *)&multicast_req, sizeof(multicast_req)) < 0) {
+    if (setsockopt(sockfd, IPPROTO_IP, IP_ADD_MEMBERSHIP, &multicast_req, sizeof(multicast_req)) < 0) {
         perror("Error joining multicast group");
         close(sockfd);
         pthread_exit(NULL);
     }
+
+    free(address);
 
     // Receive multicast messages
     char message[MAXLINE];
@@ -223,4 +275,5 @@ void cleanup(int sig){
             }
         }
     }
+    exit(0);
 }

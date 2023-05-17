@@ -14,6 +14,7 @@
 #include <string.h>
 #include <signal.h>
 #include <stdio.h>
+#include <errno.h>
 #include <fcntl.h>
 
 #define MAXLINE 1024
@@ -72,7 +73,7 @@ bool addUser(char* username, char* password, char* userType, char* file);
 void listUsers(int sockfd, int slen, struct sockaddr_in cliaddr, char* file);
 
 // authentication_methods
-char* authenticate_client(char *username, char *password, char* file);
+char* authenticate_client(char *username, char *password, char* file, char* result);
 void admin_authentication(int sockfd, clientList *list, topicList *list_top, char* file);
 void client_authentication(int conn_tcp, clientList *list, topicList *list_top, char* file);
 
@@ -99,7 +100,6 @@ void destroyTopicList(topicList* topic_List);
 void addTopic(topicList* topic_List, topic_struct newTopic);
 void removeTopic(topicList* topicList, char* topicName);
 topic_struct* getTopic(topicList* topic_List, const char* name);
-bool existsNameTopic(topicList* topic_List, const char* name);
 bool existsMulticastTopic(topicList* topic_List, const char* multicast);
 
 void printTopics(topicList* topicList);

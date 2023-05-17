@@ -5,8 +5,8 @@ int main(int argc, char *argv[]) {
 
     signal(SIGINT, SIG_IGN);
 
-    if (argc != 3) {
-        printf("Usage: {PORTO_NOTICIAS} {PORTO_CONFIG} {ficheiro configuração}\n");
+    if (argc != 4) {
+        printf("Usage: %s {PORTO_NOTICIAS} {PORTO_CONFIG} {ficheiro configuração}\n",argv[0]);
         exit(1);
     }
 
@@ -148,4 +148,6 @@ void cleanup(int sig){
 
     destroyClientList(list_clients);
     destroyTopicList(list_topics); 
+
+    exit(0);
 }

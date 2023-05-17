@@ -10,6 +10,7 @@ int porto_noticias;
 typedef struct {
     int multicast_port;
     char* multicast_address;
+    int sockfd;
 } HandleMulticastArgs;
 
 pthread_t topic_threads[MAX_TOPICS][2];
