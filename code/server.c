@@ -19,34 +19,31 @@ int main(int argc, char *argv[]) {
 
     struct sockaddr_in servaddr_udp, servaddr_tcp, cliaddr_tcp;
     socklen_t len_tcp = sizeof(cliaddr_tcp);
-    int udp_sockfds[NUM_ADMIN_THREADS];
-    int tcp_sockfd, conn_tcp, udp_port, i;
+    int udp_sockfd, tcp_sockfd, conn_tcp, j;
 
-    for (i = 0, udp_port = PORTO_CONFIG; i < NUM_ADMIN_THREADS; i++, udp_port++) {
 
-        if ((udp_sockfds[i] = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)) == -1) {
-            perror("Error creating UDP socket");
-            exit(EXIT_FAILURE);
-        }
+    if ((udp_sockfd = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)) == -1) {
+        perror("Error creating UDP socket");
+        exit(EXIT_FAILURE);
+    }
 
-        // Fill server information
-        servaddr_udp.sin_family = AF_INET;
-        servaddr_udp.sin_addr.s_addr = INADDR_ANY;
-        servaddr_udp.sin_port = htons(udp_port);
+    // Fill server information
+    servaddr_udp.sin_family = AF_INET;
+    servaddr_udp.sin_addr.s_addr = INADDR_ANY;
+    servaddr_udp.sin_port = htons(PORTO_CONFIG);
 
-        // Bind UDP socket to address
-        if (bind(udp_sockfds[i], (struct sockaddr*)&servaddr_udp, sizeof(servaddr_udp)) == -1) {
-            perror("Error binding UDP socket");
-            exit(EXIT_FAILURE);
-        }
+    // Bind UDP socket to address
+    if (bind(udp_sockfd, (struct sockaddr*)&servaddr_udp, sizeof(servaddr_udp)) == -1) {
+        perror("Error binding UDP socket");
+        exit(EXIT_FAILURE);
+    }
 
-        HandleAdminArgs admin_args = {udp_sockfds[i],list_clients, list_topics, file_config};
+    HandleAdminArgs admin_args = {udp_sockfd, list_clients, list_topics, file_config};
 
-        // Start admin authentication thread
-        if (pthread_create(&admin_threads[i], NULL, handle_admin, &admin_args) != 0) {
-            perror("Error creating admin thread");
-            exit(EXIT_FAILURE);
-        }
+    // Start admin authentication thread
+    if (pthread_create(&admin_thread, NULL, handle_admin, &admin_args) != 0) {
+        perror("Error creating admin thread");
+        exit(EXIT_FAILURE);
     }
 
      // Create TCP socket
@@ -82,9 +79,9 @@ int main(int argc, char *argv[]) {
         HandleClientArgs client_args = {conn_tcp, list_clients, list_topics, file_config};
 
         // Find an available slot for the client thread
-        for (i = 0; i < MAX_CLIENTS; i++) {
-            if (client_threads[i] == 0) {
-                if (pthread_create(&client_threads[i], NULL, handle_client, &client_args) != 0) {
+        for (j = 0; j < MAX_CLIENTS; j++) {
+            if (client_threads[j] == 0) {
+                if (pthread_create(&client_threads[j], NULL, handle_client, &client_args) != 0) {
                     perror("error creating client thread");
                     close(conn_tcp);
                     break;
@@ -94,19 +91,13 @@ int main(int argc, char *argv[]) {
         }
 
         // Maximum number of clients reached
-        if (i == MAX_CLIENTS) {
+        if (j == MAX_CLIENTS) {
             fprintf(stderr, "Maximum number of clients reached.\n");
             close(conn_tcp);
         }
     }
 
-    for (i = 0; i < NUM_ADMIN_THREADS; i++) {
-        pthread_join(admin_threads[i], NULL);
-    }
-
-    for (i = 0; i < MAX_CLIENTS; i++) {
-        pthread_join(client_threads[i], NULL);
-    }
+    wait(NULL);
 
     return 0;
 }
@@ -142,9 +133,8 @@ void cleanup(int sig){
             pthread_cancel(client_threads[i]);
         }
     }
-    for (int i = 0; i < NUM_ADMIN_THREADS; i++) {
-        pthread_cancel(admin_threads[i]);
-    }
+
+    pthread_cancel(admin_thread);
 
     destroyClientList(list_clients);
     destroyTopicList(list_topics); 

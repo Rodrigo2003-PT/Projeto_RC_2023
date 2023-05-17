@@ -34,6 +34,7 @@ void *server_handler(void *arg) {
 
     if ((sockfd = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
         erro("ERROR opening socket");
+        exit(1);
     }
 
     bzero((char *)&serv_addr, sizeof(serv_addr));
@@ -42,6 +43,8 @@ void *server_handler(void *arg) {
 
     if (connect(sockfd, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0) {
         erro("ERROR connecting to server");
+        close(sockfd);
+        exit(1);
     }
 
     while(!auth){
@@ -61,6 +64,7 @@ void *server_handler(void *arg) {
         char *token= strtok(recv_buffer, " \n");
 
         if (strcmp(token,"authentication_successful") == 0){
+            printf("%s\n",token);
             auth = true;
         }
     }
@@ -180,7 +184,6 @@ void *multicast_sender_handler(void *arg) {
     free(address);
 
     while(1){
-        printf("HERE_50\n");
         char recv_buffer[MAXLINE];
         if (recv(tcp_sock, recv_buffer, MAXLINE, 0) == -1) {
             perror("Error receiving command from server");

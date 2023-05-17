@@ -16,7 +16,10 @@ void handle_admin_console(int sockfd, clientList *list, topicList *list_top, cha
         // Receive command from admin console
         if((recv_len = recvfrom(sockfd, buffer, MAXLINE, 0, (struct sockaddr *) &cliaddr, (socklen_t *)&slen)) == -1) {
             erro("Erro no recvfrom");
+            quitConsole(sockfd);
+            break;
         }
+
         buffer[recv_len] = '\0';
 
         // Parse the command
@@ -80,7 +83,8 @@ void handle_leitor_commands(int sockfd, clientList *list, topicList *list_top, c
         // Receive command from client
         if (recv(sockfd, buffer, MAXLINE, 0) == -1) {
             perror("Error receiving command from client");
-            exit(EXIT_FAILURE);
+            close(sockfd);
+            break;
         }
 
         // Parse command
@@ -126,17 +130,18 @@ void handle_jornalista_commands(int sockfd, clientList *list, topicList *list_to
         // Receive command from client
         if (recv(sockfd, buffer, MAXLINE, 0) == -1) {
             perror("Error receiving command from client");
-            exit(EXIT_FAILURE);
+            close(sockfd);
+            break;
         }
 
         // Parse command
         token = strtok(buffer, " \n");
 
         if (strcmp(token, "LIST_TOPICS") == 0) {
-
             pthread_mutex_lock(&topic_mutex);
             topicNode *cur_topic = list_top->head;
             char topic_str[MAXLINE] = "";
+
             while (cur_topic != NULL) {
                 strcat(topic_str, cur_topic->topic.name);
                 strcat(topic_str, "\n");
@@ -211,6 +216,8 @@ void admin_authentication(int sockfd, clientList *list, topicList *list_top, cha
         // Receive credentials from admin console
         if((recv_len = recvfrom(sockfd, buffer, MAXLINE, 0, (struct sockaddr *) &cliaddr, (socklen_t *)&slen)) == -1) {
             erro("Erro no recvfrom");
+            close(sockfd);
+            break;
         }
         
         // Para ignorar o restante conteúdo (anterior do buffer)
@@ -249,6 +256,8 @@ void client_authentication(int sockfd, clientList *list, topicList *list_top, ch
         // Receive credentials from client
         if((recv_len = recv(sockfd, buffer, MAXLINE, 0)) == -1) {
             erro("Erro no recv");
+            close(sockfd);
+            break;
         }
         
         // Para ignorar o restante conteúdo (anterior do buffer)

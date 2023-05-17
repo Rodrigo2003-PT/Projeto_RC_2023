@@ -4,7 +4,6 @@
 //User libraries
 #include "admin_functions.h"
 
-#define NUM_ADMIN_THREADS 5
 #define MAXLINE 1024
 
 typedef struct {
@@ -21,7 +20,7 @@ typedef struct {
     char* file_config;
 } HandleAdminArgs;
 
-pthread_t admin_threads[NUM_ADMIN_THREADS];
+pthread_t admin_thread;
 pthread_t client_threads[MAX_CLIENTS];
 
 clientList* list_clients;
