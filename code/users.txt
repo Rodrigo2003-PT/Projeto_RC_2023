@@ -3,3 +3,4 @@ manuel;zpt567;leitor
 joana;azq1212;jornalista
 rodrigo;sasilva;leitor
 jose;culatra;jornalista
+rolando;troi;jornalista

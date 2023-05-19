@@ -14,6 +14,8 @@ int main(int argc, char *argv[]) {
     int PORTO_CONFIG = atoi(argv[2]);
     char *file_config = argv[3];
 
+    init_shm();
+
     list_clients = createClientList();
     list_topics = newTopicList();
 
@@ -125,6 +127,28 @@ void *handle_client(void *arg) {
     return NULL;
 }
 
+void init_shm(){
+    key_t key = ftok("/path/to/file", 'R');
+    
+    if ((shm_id = shmget(key, sizeof(struct Entry) * MAX_TOPICS, IPC_CREAT | IPC_EXCL | 0700)) < 1){
+        printf("ERROR IN SHMGET WITH IPC_CREAT\n");
+        exit(1);
+    }
+
+    if((dictionary = (struct Entry*) shmat(shm_id, NULL, 0)) == (struct Entry*)-1){
+        printf("ERROR ATTACHING SHARED MEMORY\n");
+        exit(0);
+    }
+
+    for (int i = 0; i < MAX_TOPICS; i++) {
+        dictionary[i] = (struct Entry){
+            .address = "",
+            .port = 0,
+            .sockfd = 0
+        };
+    };
+}
+
 void cleanup(int sig){
     printf("SYSTEM EXITING\n");
     
@@ -136,6 +160,8 @@ void cleanup(int sig){
 
     pthread_cancel(admin_thread);
 
+    if(shmdt(dictionary) == -1)printf("ERROR DETACHING SHM SEGMENT\n");
+    if(shmctl(shm_id, IPC_RMID, NULL) == -1)printf("ERROR REMOVING SHM SEGMENT\n");
     destroyClientList(list_clients);
     destroyTopicList(list_topics); 
 

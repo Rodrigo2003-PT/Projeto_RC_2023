@@ -26,6 +26,7 @@ pthread_t client_threads[MAX_CLIENTS];
 clientList* list_clients;
 topicList* list_topics;
 
+void init_shm();
 void cleanup(int sig);
 void *handle_admin(void *arg);
 void *handle_client(void *arg);

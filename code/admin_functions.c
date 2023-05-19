@@ -182,11 +182,10 @@ void handle_jornalista_commands(int sockfd, clientList *list, topicList *list_to
         }
         else if(strcmp(token,"SEND_NEWS") == 0){
             char* multicast_id = strtok(NULL," ");
-            char* message = strtok(NULL,"\n");
 
             if(existsMulticastTopic(list_top,multicast_id)){
                 char msg[MAXLINE];
-                snprintf(msg, MAXLINE, "SUCCESSFUL %s\n", message);
+                strcpy(msg,"SUCCESSFULL");
                 if (send(sockfd, msg, strlen(msg), 0) == -1) {
                     perror("Error sending message to client");
                     exit(EXIT_FAILURE);

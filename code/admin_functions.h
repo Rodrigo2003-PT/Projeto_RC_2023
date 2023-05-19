@@ -9,6 +9,8 @@
 #include <sys/wait.h>
 #include <stdbool.h>
 #include <pthread.h>
+#include <sys/shm.h>
+#include <sys/ipc.h>
 #include <unistd.h>
 #include <stdlib.h>
 #include <string.h>
@@ -57,12 +59,20 @@ typedef struct topicList {
     int size;
 } topicList;
 
-
 typedef struct news_struct {
     char title[100];
     char content[1000];
     char timestamp[30];
 } news_struct;
+
+struct Entry {
+    int port;
+    int sockfd;
+    char address[16];
+};
+
+struct Entry *dictionary;
+int shm_id;
 
 // admin_console operations
 void quitServer(int sockfd);

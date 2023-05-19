@@ -1,6 +1,7 @@
 #include "client.h"
 
 bool auth = false;
+bool is_reused = false;
 
 int main(int argc, char *argv[]) {
 
@@ -8,6 +9,14 @@ int main(int argc, char *argv[]) {
     if (argc != 3) {
         printf("Usage: %s {Endereço_Servidor} {PORTO_NOTICIAS}\n",argv[0]);
         exit(1);
+    }
+
+    key_t key = ftok("/path/to/file", 'R');
+    int shmid = shmget(key, 0, 0);
+
+    if((dictionary = (struct Entry*) shmat(shmid, NULL, 0)) == (struct Entry*)-1){
+        printf("ERROR ATTACHING SHARED MEMORY\n");
+        exit(0);
     }
 
     server_address = argv[1];
@@ -74,7 +83,6 @@ void *server_handler(void *arg) {
         bzero(buffer, MAXLINE);
         fgets(buffer, MAXLINE - 1, stdin);
         buffer[strcspn(buffer, "\n")] = 0;
-
         char buffer_copy[MAXLINE];
         strcpy(buffer_copy, buffer);
         char* token = strtok(buffer_copy, " \n");
@@ -83,6 +91,7 @@ void *server_handler(void *arg) {
             break;
         }
         else if(strcmp(token,"SUBSCRIBE_TOPIC") == 0){
+            is_reused = false;
             if (send(sockfd, buffer, MAXLINE, 0) == -1) {
                 perror("Error sending message to server\n");
                 exit(EXIT_FAILURE);
@@ -93,28 +102,32 @@ void *server_handler(void *arg) {
             }
 
             char *multicast_address = strtok(recv_buffer, " \n");
+            HandleMulticastArgs args;
 
-            HandleMulticastArgs args = {multicast_port, strdup(multicast_address), sockfd};
+            for (int i = 0; i < MAX_TOPICS; i++) {
+                if (strcmp(dictionary[i].address,multicast_address) == 0) {
+                    strncpy(args.multicast_address, multicast_address, sizeof(args.multicast_address));
+                    args.multicast_port = dictionary[i].port;
+                    is_reused = true;
+                }
+            }
+
+            if(!is_reused){
+                strncpy(args.multicast_address, multicast_address, sizeof(args.multicast_address));
+                args.multicast_port = multicast_port;
+            }
 
             for(int i = 0; i < MAX_TOPICS; i++){
-                for(int j = 0; j < 2; j++){
-                    if(topic_threads[i][j] == 0){
-                        if(j==0){
-                            if (pthread_create(&topic_threads[i][j], NULL, multicast_sender_handler, &args) != 0) {
-                                erro("ERROR creating multicast thread");
-                            }
-                        }
-                        else{
-                            if (pthread_create(&topic_threads[i][j], NULL, multicast_receiver_handler, &args) != 0) {
-                                erro("ERROR creating multicast thread");
-                            }
-                        }
+                if(topic_threads[i] == 0){
+                    if (pthread_create(&topic_threads[i], NULL, multicast_receiver_handler, &args) != 0) {
+                        erro("ERROR creating multicast thread");
                     }
+                    break;
                 }
-                break;
             }
             multicast_port++;
         }
+
         else if(strcmp(token,"LIST_TOPICS") == 0){
             if (send(sockfd, buffer, MAXLINE, 0) == -1) {
                 perror("Error sending message to server\n");
@@ -135,13 +148,33 @@ void *server_handler(void *arg) {
                 perror("Error receiving command from server");
                 exit(EXIT_FAILURE);
             }
-            printf("%s",recv_buffer);
+            printf("%s\n",recv_buffer);
         }
         else if(strcmp(token,"SEND_NEWS") == 0){
+            char* multicast_id = strtok(NULL," ");
+            char* message = strtok(NULL,"\n");
+           
             if (send(sockfd, buffer, MAXLINE, 0) == -1) {
                 perror("Error sending message to server\n");
                 exit(EXIT_FAILURE);
             }
+
+            if (recv(sockfd, recv_buffer, MAXLINE, 0) == -1) {
+                perror("Error receiving command from server");
+                exit(EXIT_FAILURE);
+            }
+
+            if(strncmp(recv_buffer,"SUCCESSFULL",11) == 0){
+                pthread_mutex_lock(&mutex);
+                for (int i = 0; i < MAX_TOPICS; i++) {
+                    if (strcmp(dictionary[i].address, multicast_id) == 0) {
+                        printf("sockfd:%d port:%d multicast_id:%s message:%s\n",dictionary[i].sockfd,dictionary[i].port,multicast_id, message);
+                        multicast_send(dictionary[i].sockfd, dictionary[i].port, multicast_id, message);
+                        break;
+                    }
+                }
+                pthread_mutex_unlock(&mutex);
+            }  
         }
         else{
             printf("Invalid Command\n");
@@ -149,67 +182,32 @@ void *server_handler(void *arg) {
     }
 
     close(sockfd);
-    pthread_cancel(multicast_thread);
     pthread_exit(NULL);
 }
 
-// TO COMPLETE
-void *multicast_sender_handler(void *arg) {
-    HandleMulticastArgs* args = (HandleMulticastArgs*) arg;
-    int port = args->multicast_port;
-    char* address = strdup(args->multicast_address);
-    int tcp_sock = args->sockfd;
-
-    // Create a UDP socket
-    int sockfd = socket(AF_INET, SOCK_DGRAM, 0);
-    if (sockfd < 0) {
-        perror("Error opening socket");
-        pthread_exit(NULL);
-    }
-
-    // Set up the multicast group information
+void multicast_send(int sockfd, int multicast_port, char* group_address, char* message){
     struct sockaddr_in multicast_addr;
-    bzero((char *)&multicast_addr, sizeof(multicast_addr));
+    memset(&multicast_addr, 0, sizeof(multicast_addr));
     multicast_addr.sin_family = AF_INET;
-    multicast_addr.sin_port = htons(port);
-    multicast_addr.sin_addr.s_addr = inet_addr(address);
+    multicast_addr.sin_port = htons(multicast_port); 
 
-    // enable multicast on the socket
-    int enable = 1;
-    if (setsockopt(sockfd, IPPROTO_IP, IP_MULTICAST_TTL, &enable, sizeof(enable)) < 0) {
-        perror("setsockopt");
-        exit(1);
+    if (inet_aton(group_address, &multicast_addr.sin_addr) == 0) {
+        perror("Invalid multicast address");
+        exit(EXIT_FAILURE);
     }
 
-    free(address);
-
-    while(1){
-        char recv_buffer[MAXLINE];
-        if (recv(tcp_sock, recv_buffer, MAXLINE, 0) == -1) {
-            perror("Error receiving command from server");
-            exit(EXIT_FAILURE);
-        }
-        char *token= strtok(recv_buffer, " ");
-
-        if (strcmp(token,"SUCCESSFUL") == 0){
-            token = strtok(NULL,"\n");
-            // Send the message to the multicast group
-            if (sendto(sockfd, token, strlen(token), 0, (struct sockaddr *)&multicast_addr, sizeof(multicast_addr)) < 0) {
-                perror("Error sending multicast message");
-                break;
-            }
-        }
+    if (sendto(sockfd, message, strlen(message), 0, (struct sockaddr *)&multicast_addr, sizeof(multicast_addr)) < 0) {
+        perror("Error sending multicast message");
+        exit(EXIT_FAILURE);
     }
-    
-    return NULL;
 }
 
 void *multicast_receiver_handler(void *arg){
     HandleMulticastArgs* args = (HandleMulticastArgs*) arg;
+    char group_address[16];
+    strncpy(group_address, args->multicast_address, sizeof(group_address));
     int port = args->multicast_port;
-    char* address = strdup(args->multicast_address);
 
-    // Create a UDP socket
     int sockfd = socket(AF_INET, SOCK_DGRAM, 0);
     if (sockfd < 0) {
         perror("Error opening socket");
@@ -224,12 +222,26 @@ void *multicast_receiver_handler(void *arg){
         pthread_exit(NULL);
     }
 
+    // enable multicast on the socket
+    int enable = 1;
+    if (setsockopt(sockfd, IPPROTO_IP, IP_MULTICAST_TTL, &enable, sizeof(enable)) < 0) {
+        perror("setsockopt");
+        pthread_exit(NULL);
+    }
+
+    printf("sockfd:%d port:%d\n",sockfd,port);
+    
+    pthread_mutex_lock(&mutex);
+    addEntry(port,sockfd,group_address);
+    pthread_mutex_unlock(&mutex);
+
     // Set up the multicast group information
     struct sockaddr_in multicast_addr;
     bzero((char *)&multicast_addr, sizeof(multicast_addr));
     multicast_addr.sin_family = AF_INET;
-    multicast_addr.sin_addr.s_addr = inet_addr(address);
+    multicast_addr.sin_addr.s_addr = inet_addr(group_address);
     multicast_addr.sin_port = htons(port);
+
 
     // Bind the socket to the multicast address and port
     if (bind(sockfd, (struct sockaddr *)&multicast_addr, sizeof(multicast_addr)) < 0) {
@@ -240,7 +252,7 @@ void *multicast_receiver_handler(void *arg){
 
     // Join the multicast group
     struct ip_mreq multicast_req;
-    multicast_req.imr_multiaddr.s_addr = inet_addr(address);
+    multicast_req.imr_multiaddr.s_addr = inet_addr(group_address);
     multicast_req.imr_interface.s_addr = htonl(INADDR_ANY);
     if (setsockopt(sockfd, IPPROTO_IP, IP_ADD_MEMBERSHIP, &multicast_req, sizeof(multicast_req)) < 0) {
         perror("Error joining multicast group");
@@ -248,34 +260,55 @@ void *multicast_receiver_handler(void *arg){
         pthread_exit(NULL);
     }
 
-    free(address);
-
     // Receive multicast messages
     char message[MAXLINE];
+    ssize_t num_bytes;
+    struct sockaddr_in sender_addr;
+    socklen_t sender_len = sizeof(sender_addr);
     while (1) {
-        struct sockaddr_in sender_addr;
-        socklen_t sender_len = sizeof(sender_addr);
-        ssize_t num_bytes = recvfrom(sockfd, message, MAXLINE, 0, (struct sockaddr *)&sender_addr, &sender_len);
+        num_bytes = recvfrom(sockfd, message, MAXLINE, 0, (struct sockaddr *)&sender_addr, &sender_len);
         if (num_bytes < 0) {
             perror("Error receiving multicast message");
             break;
         }
         message[num_bytes] = '\0';
-        printf("Received: %s\n", message);
+        printf("Received from %s: %s\n", group_address, message);
         memset(message,0,MAXLINE);
     }
 
-    return NULL;
+close(sockfd);
+return NULL;
+}
+
+void addEntry(int port, int sockfd, const char* address) {
+    // Check if sockfd already exists in the dictionary
+    for (int i = 0; i < MAX_TOPICS; i++) {
+        if (dictionary[i].sockfd == sockfd) {
+            printf("sockfd %d already exists in the dictionary.\n", sockfd);
+            return;
+        }
+    }
+
+    // Add the new entry to the dictionary
+    for (int i = 0; i < MAX_TOPICS; i++) {
+        if (dictionary[i].sockfd == 0) {
+            printf("%d\n", i);
+            dictionary[i].port = port;
+            dictionary[i].sockfd = sockfd;
+            strncpy(dictionary[i].address, address, 16);
+            return;
+        }
+    }
+
+    printf("Dictionary is full. Cannot add new entry.\n");
 }
 
 void cleanup(int sig){
     printf("SYSTEM EXITING\n");
-    
+
     for (int i = 0; i < MAX_TOPICS; i++) {
-        for(int j = 0; j < 2; j++){
-            if (topic_threads[i][j] != 0) {
-                pthread_cancel(topic_threads[i][j]);
-            }
+        if (topic_threads[i] != 0) {
+            pthread_cancel(topic_threads[i]);
         }
     }
     exit(0);
