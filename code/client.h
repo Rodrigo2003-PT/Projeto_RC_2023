@@ -20,9 +20,10 @@ pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 int multicast_port;
 
 void cleanup(int sig);
+int getLargestPortNumber();
 void *server_handler(void *arg);
 void *multicast_receiver_handler(void *arg);
-void addEntry(int port, int sockfd, const char* address);
-void multicast_send(int sockfd, int multicast_port, char* group_address, char* message);
+void addEntry(int port, const char* address);
+void multicast_send(int multicast_port, char* group_address, char* message);
 
 #endif 

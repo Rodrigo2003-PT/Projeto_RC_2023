@@ -1,5 +1,7 @@
 #include "admin_functions.h"
 
+// TO-DO FINISHED
+
 pthread_mutex_t topic_mutex = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t client_mutex = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t admin_file_mutex = PTHREAD_MUTEX_INITIALIZER;
@@ -15,7 +17,7 @@ void handle_admin_console(int sockfd, clientList *list, topicList *list_top, cha
 
         // Receive command from admin console
         if((recv_len = recvfrom(sockfd, buffer, MAXLINE, 0, (struct sockaddr *) &cliaddr, (socklen_t *)&slen)) == -1) {
-            erro("Erro no recvfrom");
+            perror("ERRO NO RECVFROM\n");
             quitConsole(sockfd);
             break;
         }
@@ -33,9 +35,9 @@ void handle_admin_console(int sockfd, clientList *list, topicList *list_top, cha
             pthread_mutex_lock(&admin_file_mutex);
 
             if (addUser(username, password, userType, file)) {
-                sendto(sockfd, "user added successfully\n", strlen("user added successfully\n"), MSG_CONFIRM, (const struct sockaddr *)&cliaddr, slen);
+                sendto(sockfd, "USER_ADDED_SUCCESSFULY\n", strlen("USER_ADDED_SUCCESSFULY\n"), MSG_CONFIRM, (const struct sockaddr *)&cliaddr, slen);
             } else {
-                sendto(sockfd, "failed to add user\n", strlen("failed to add user\n"), MSG_CONFIRM, (const struct sockaddr *)&cliaddr, slen);
+                sendto(sockfd, "FAILED_TO_ADD_USER\n", strlen("FAILED_TO_ADD_USER\n"), MSG_CONFIRM, (const struct sockaddr *)&cliaddr, slen);
                 }
             
             pthread_mutex_unlock(&admin_file_mutex);
@@ -48,10 +50,10 @@ void handle_admin_console(int sockfd, clientList *list, topicList *list_top, cha
 
             if (deleteUser(username, file)) {
                 removeClient(list,list_top,username);
-                sendto(sockfd, "user deleted successfully\n", strlen("user deleted successfully\n"), MSG_CONFIRM, (const struct sockaddr *)&cliaddr, slen);
+                sendto(sockfd, "USER_DELETED_SUCCESSFULY\n", strlen("USER_DELETED_SUCCESSFULY\n"), MSG_CONFIRM, (const struct sockaddr *)&cliaddr, slen);
             }
             else {
-                sendto(sockfd, "failed to delete user\n", strlen("failed to delete user\n"), MSG_CONFIRM, (const struct sockaddr *)&cliaddr, slen);
+                sendto(sockfd, "FAILED_TO_DELETE_USER\n", strlen("FAILED_TO_DELETE_USER\n"), MSG_CONFIRM, (const struct sockaddr *)&cliaddr, slen);
             }
 
             pthread_mutex_unlock(&admin_file_mutex);
@@ -69,7 +71,7 @@ void handle_admin_console(int sockfd, clientList *list, topicList *list_top, cha
             quitServer(sockfd);
         }
         else {
-            sendto(sockfd, "invalid command\n", strlen("invalid command\n"), MSG_CONFIRM, (const struct sockaddr *)&cliaddr, slen);
+            sendto(sockfd, "INVALID_COMMAND\n", strlen("INVALID_COMMAND\n"), MSG_CONFIRM, (const struct sockaddr *)&cliaddr, slen);
         }
     }
 }
@@ -82,7 +84,7 @@ void handle_leitor_commands(int sockfd, clientList *list, topicList *list_top, c
     while (1) {
         // Receive command from client
         if (recv(sockfd, buffer, MAXLINE, 0) == -1) {
-            perror("Error receiving command from client");
+            perror("ERROR_RECEIVING_FROM_CLIENT\n");
             close(sockfd);
             break;
         }
@@ -104,7 +106,7 @@ void handle_leitor_commands(int sockfd, clientList *list, topicList *list_top, c
             pthread_mutex_unlock(&topic_mutex);
 
             if (send(sockfd, topic_str, strlen(topic_str), 0) == -1) {
-                perror("Error sending message to client");
+                perror("ERROR_SENDING_MESSAGE_TO_CLIENT\n");
                 exit(EXIT_FAILURE);
             }
         } 
@@ -114,8 +116,8 @@ void handle_leitor_commands(int sockfd, clientList *list, topicList *list_top, c
         }
         else {
             // Invalid command
-            if (send(sockfd, "Invalid command\n", 17, 0) == -1) {
-                perror("Error sending message to client");
+            if (send(sockfd, "INVALID_COMMAND\n", 17, 0) == -1) {
+                perror("ERROR_SENDING_MESSAGE_TO_CLIENT\n");
                 exit(EXIT_FAILURE);
             }
         }
@@ -129,7 +131,7 @@ void handle_jornalista_commands(int sockfd, clientList *list, topicList *list_to
     while (1) {
         // Receive command from client
         if (recv(sockfd, buffer, MAXLINE, 0) == -1) {
-            perror("Error receiving command from client");
+            perror("ERROR_RECEIVING_COMMAND_FROM_CLIENT\n");
             close(sockfd);
             break;
         }
@@ -150,7 +152,7 @@ void handle_jornalista_commands(int sockfd, clientList *list, topicList *list_to
             pthread_mutex_unlock(&topic_mutex);
 
             if (send(sockfd, topic_str, strlen(topic_str), 0) == -1) {
-                perror("Error sending message to client");
+                perror("ERROR_SENDING_MESSAGE_TO_CLIENT\n");
                 exit(EXIT_FAILURE);
             }
         } 
@@ -174,9 +176,9 @@ void handle_jornalista_commands(int sockfd, clientList *list, topicList *list_to
 
             // Send a confirmation message to the client
             char msg[MAXLINE];
-            snprintf(msg, MAXLINE, "Topic created: %s\n", new_topic.name);
+            snprintf(msg, MAXLINE, "TOPIC_CREATED: %s\n", new_topic.name);
             if (send(sockfd, msg, strlen(msg), 0) == -1) {
-                perror("Error sending message to client");
+                perror("ERROR_SENDING_MESSAGE_TO_CLIENT\n");
                 exit(EXIT_FAILURE);
             }
         }
@@ -187,15 +189,15 @@ void handle_jornalista_commands(int sockfd, clientList *list, topicList *list_to
                 char msg[MAXLINE];
                 strcpy(msg,"SUCCESSFULL");
                 if (send(sockfd, msg, strlen(msg), 0) == -1) {
-                    perror("Error sending message to client");
+                    perror("ERROR_SENDING_MESSAGE_TO_CLIENT\n");
                     exit(EXIT_FAILURE);
                 }
             }
         }
         else {
             // Invalid command
-            if (send(sockfd, "Invalid command\n", 17, 0) == -1) {
-                perror("Error sending message to client");
+            if (send(sockfd, "INVALID_COMMAND\n", 17, 0) == -1) {
+                perror("ERROR_SENDING_MESSAGE_TO_CLIENT\n");
                 exit(EXIT_FAILURE);
             }
         }
@@ -214,7 +216,7 @@ void admin_authentication(int sockfd, clientList *list, topicList *list_top, cha
 
         // Receive credentials from admin console
         if((recv_len = recvfrom(sockfd, buffer, MAXLINE, 0, (struct sockaddr *) &cliaddr, (socklen_t *)&slen)) == -1) {
-            erro("Erro no recvfrom");
+            perror("ERRO NO RECVFROM\n");
             close(sockfd);
             break;
         }
@@ -229,12 +231,11 @@ void admin_authentication(int sockfd, clientList *list, topicList *list_top, cha
         // Verify credentials
         if (strcmp(username, "admin") == 0 && strcmp(password, "password") == 0) {
             authenticated = true;
-            sendto(sockfd, "authentication successful\n", strlen("authentication successful\n"), MSG_CONFIRM, (const struct sockaddr *)&cliaddr, slen);
+            sendto(sockfd, "AUTHENTICATION SUCCESSFUL\n", strlen("AUTHENTICATION SUCCESSFUL\n"), MSG_CONFIRM, (const struct sockaddr *)&cliaddr, slen);
             handle_admin_console(sockfd, list, list_top, file);
         } 
         else {
-            sendto(sockfd, "authentication failed: <username> <password>\n", strlen("authentication failed <username> <password>\n"), MSG_CONFIRM, (const struct sockaddr *)&cliaddr, slen);
-            printf("Authentication failed.\n");
+            sendto(sockfd, "AUTHENTICATION FAILED: <username> <password>\n", strlen("AUTHENTICATION FAILED <username> <password>\n"), MSG_CONFIRM, (const struct sockaddr *)&cliaddr, slen);
         }
     }
 }
@@ -254,7 +255,7 @@ void client_authentication(int sockfd, clientList *list, topicList *list_top, ch
 
         // Receive credentials from client
         if((recv_len = recv(sockfd, buffer, MAXLINE, 0)) == -1) {
-            erro("Erro no recv");
+            perror("ERRO NO RECV\n");
             close(sockfd);
             break;
         }
@@ -270,10 +271,10 @@ void client_authentication(int sockfd, clientList *list, topicList *list_top, ch
         if ((token = authenticate_client(username,password,file,result)) != NULL) {
             authenticated = true;
             free(result);
-            send(sockfd, "authentication_successful\n", strlen("authentication_successful\n"), 0);
+            send(sockfd, "AUTHENTICATION_SUCCESSFUL\n", strlen("AUTHENTICATION_SUCCESSFUL\n"), 0);
 
             if(getpeername(sockfd, (struct sockaddr *)&client_address, &client_address_len) == -1){
-                printf("Error getting client address\n");
+                printf("ERROR_GETING_CLIENT_ADDRESS\n");
                 close(sockfd);
                 return;
             }
@@ -288,8 +289,7 @@ void client_authentication(int sockfd, clientList *list, topicList *list_top, ch
             }
         } 
         else {
-            send(sockfd, "authentication failed: <username> <password>\n", strlen("authentication failed <username> <password>\n"),0);
-            printf("Authentication failed.\n");
+            send(sockfd, "WRONG_CREDENTIALS\n", strlen("WRONG_CREDENTIALS\n"),0);
         }
     }
 };
@@ -304,7 +304,7 @@ char* authenticate_client(char *username, char *password, char* file, char* resu
     pthread_mutex_lock(&admin_file_mutex);
     fp = fopen(file, "r");
     if (fp == NULL) {
-        perror("Error opening file");
+        perror("ERROR OPENING FILE\n");
         exit(EXIT_FAILURE);
     }
 
@@ -346,7 +346,7 @@ bool addUser(char* username, char* password, char* userType, char* file) {
 
     // Check if the file was opened successfully
     if (fp == NULL) {
-        printf("Error opening file.");
+        printf("ERROR_OPENING_FILE\n");
         return false;
     }
 
@@ -369,7 +369,7 @@ bool addUser(char* username, char* password, char* userType, char* file) {
 
     // If user already exists, return false
     if (userExists) {
-        printf("User already exists.\n");
+        printf("USER_EXISTS\n");
         return false;
     }
 
@@ -378,7 +378,7 @@ bool addUser(char* username, char* password, char* userType, char* file) {
 
     // Check if the file was opened successfully
     if (fp == NULL) {
-        printf("Error opening file.");
+        printf("ERROR_OPENING_FILE\n");
         return false;
     }
 
@@ -403,7 +403,7 @@ bool deleteUser(char* username, char* file) {
 
     // Check if file could be opened
     if (fp == NULL || temp == NULL) {
-        printf("Error opening file.\n");
+        printf("ERROR_OPENING_FILE\n");
         return false;
     }
 
@@ -432,10 +432,10 @@ bool deleteUser(char* username, char* file) {
     rename(tempFile, file);
 
     if (found) {
-        printf("User deleted successfully.\n");
+        printf("USER_DELETED_SUCCESSFULY\n");
         return true;
     } else {
-        printf("User not found.\n");
+        printf("USER_NOT_FOUND\n");
         return false;
     }
 }
@@ -451,7 +451,7 @@ void listUsers(int sockfd, int slen, struct sockaddr_in cliaddr, char* file) {
     fp = fopen(file, "r");
 
     if (fp == NULL) {
-        printf("Error: could not open file\n");
+        printf("ERROR: COULD_NOT_OPEN_FILE\n");
         return;
     }
 
@@ -469,13 +469,13 @@ void listUsers(int sockfd, int slen, struct sockaddr_in cliaddr, char* file) {
 
 // Function to handle QUIT command
 void quitConsole(int sockfd) {
-    printf("Admin console session ended.\n");
+    printf("ADMIN CONSOLE SESSION ENDED\n");
     close(sockfd);
 }
 
 // Function to handle QUIT_SERVER command
 void quitServer(int sockfd) {
-    printf("Server shutting down.\n");
+    printf("SERVER_SHUTTING_DOWN\n");
     close(sockfd);
     exit(EXIT_SUCCESS);
 }
@@ -489,7 +489,7 @@ void erro(char *s) {
 clientNode* createClientNode(client_struct client) {
     clientNode* node = (clientNode*) malloc(sizeof(clientNode));
     if (node == NULL) {
-        fprintf(stderr, "Error: could not allocate memory for client node\n");
+        fprintf(stderr, "ERROR: COULD NOT ALLOCATE MEMORY FOR CLIENT_NODE\n");
         exit(EXIT_FAILURE);
     }
     node->client = client;
@@ -502,7 +502,7 @@ clientNode* createClientNode(client_struct client) {
 clientList* createClientList() {
     clientList* list = (clientList*) malloc(sizeof(clientList));
     if (list == NULL) {
-        fprintf(stderr, "Error: could not allocate memory for client list\n");
+        fprintf(stderr, "ERROR: COULD NOT ALLOCATE MEMORY FOR CLIENT LIST\n");
         exit(EXIT_FAILURE);
     }
     list->head = NULL;
@@ -615,23 +615,23 @@ client_struct createClient(struct sockaddr_in address, char *username, clientLis
 void printClientList(clientList* list) {
     pthread_mutex_lock(&client_mutex);
     clientNode* current = list->head;
-    printf("Client List:\n");
+    printf("CLIENT_LIST:\n");
     printf("------------\n");
     while (current != NULL) {
-        printf("Username: %s\n", current->client.user_name);
-        printf("Number of subscribed topics: %d\n", current->client.num_subscribed_topics);
-        printf("Subscribed topics: ");
+        printf("USERNAME: %s\n", current->client.user_name);
+        printf("NUMER OF SUBSCRIBED TOPICS: %d\n", current->client.num_subscribed_topics);
+        printf("SUBSCRIBED_TOPICS: ");
         for (int i = 0; i < current->client.num_subscribed_topics; i++) {
             printf("%s ", current->client.topics[i]);
         }
         printf("\n");
-        printf("Address: %s\n", inet_ntoa(current->client.address.sin_addr));
-        printf("Multicast addresses: ");
+        printf("ADDRESS: %s\n", inet_ntoa(current->client.address.sin_addr));
+        printf("MULTICAST_ADDRESSES: ");
         for (int i = 0; i < current->client.num_subscribed_topics; i++) {
             char multicast_str[INET_ADDRSTRLEN];
             for (int j = 0; j < 16; j++) {
                 if (inet_ntop(AF_INET, &(current->client.multicast_addresses[i][j]), multicast_str, INET_ADDRSTRLEN) == NULL) {
-                    perror("Error converting multicast address to string");
+                    perror("ERROR -> CONVERTING MULTICAST TO STRING\n");
                     exit(EXIT_FAILURE);
                 }
                 printf("%s ", multicast_str);
@@ -689,7 +689,7 @@ void addTopic(topicList* topic_List, topic_struct newTopic) {
 void removeTopic(topicList* list, char* topic_name) {
     // Check if the list is empty
     if (list->head == NULL) {
-        printf("The topic list is empty\n");
+        printf("THE TOPIC IS EMPTY\n");
         return;
     }
     // Check if the head node is the target node
@@ -707,7 +707,7 @@ void removeTopic(topicList* list, char* topic_name) {
     }
     // Check if the target node was found
     if (current->next == NULL) {
-        printf("Topic not found\n");
+        printf("TOPIC_NOT_FOUND\n");
         return;
     }
     // Remove the target node
@@ -741,20 +741,20 @@ bool existsMulticastTopic(topicList* topic_List, const char* multicast){
 
 void printTopics(topicList* list) {
     pthread_mutex_lock(&topic_mutex);
-    printf("List of topics:\n");
+    printf("LIST_OF_TOPICS:\n");
     printf("----------------\n");
 
     if (list->size == 0) {
-        printf("No topics found.\n");
+        printf("NO_TOPICS_FOUND\n");
     } else {
         topicNode* current = list->head;
         int i = 1;
 
         while (current != NULL) {
-            printf("Topic %d:\n", i);
-            printf("Name: %s\n", current->topic.name);
-            printf("Multicast Address: %s\n", current->topic.multicast_address);
-            printf("Subscribed Clients:\n");
+            printf("TOPIC %d:\n", i);
+            printf("NAME: %s\n", current->topic.name);
+            printf("MULTICAST_ADDRESS: %s\n", current->topic.multicast_address);
+            printf("SUBSCRIBED_CLIENTS:\n");
 
             for (int j = 0; j < current->topic.num_subscribed_clients; j++) {
                 char addr[INET_ADDRSTRLEN];
@@ -776,12 +776,12 @@ void subscribeTopic(topicList *list_top, client_struct *client, char* name, int 
     topic_struct *topic = getTopic(list_top, name);
     if (topic == NULL) {
         // Topic not found
-        printf("Topic '%s' not found\n", name);
+        printf("TOPIC '%s' NOT_FOUND\n", name);
         return;
     }
     // Add client to the topic's list of subscribed clients
     if (topic->num_subscribed_clients >= MAX_CLIENTS) {
-        printf("Topic %s already has maximum number of subscribers.\n", topic->name);
+        printf("TOPIC %s HAS MAXIMUM NUMBER OF SUBSCRIBERS\n", topic->name);
         return;
     }
     topic->subscribed_clients[topic->num_subscribed_clients] = client->address;
@@ -792,21 +792,21 @@ void subscribeTopic(topicList *list_top, client_struct *client, char* name, int 
     pthread_mutex_lock(&client_mutex);
     // Add the topic to the client's list of subscribed topics
     if (client->num_subscribed_topics >= MAX_TOPICS) {
-        printf("Client already subscribed to maximum number of topics.\n");
+        printf("CLIENT SUBSCRIBED TO MAXIMUM NUMBERT OF TOPICS\n");
         return;
     }
     strcpy(client->topics[client->num_subscribed_topics], name);
     client->num_subscribed_topics++;
     // Add the topic's multicast address to the client's list of multicast addresses
     if (inet_aton(topic->multicast_address, &client->multicast_addresses[client->num_subscribed_topics-1][0]) == 0) {
-        perror("Error converting multicast address to network format");
+        perror("ERROR_CONVERTING MULTICAST_ADDRESS_TO_NETWORK_FORMAT\n");
         return;
     }
     pthread_mutex_unlock(&client_mutex);
 
     // Send the multicast address to the client
     if (send(sockfd, topic->multicast_address, strlen(topic->multicast_address), 0) == -1) {
-        perror("Error sending multicast address to client");
+        perror("ERROR -> SENDING_MULTICAST_ADDRESS_TO_CLIENT\n");
         return;
     }
 }

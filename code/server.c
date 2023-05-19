@@ -1,13 +1,15 @@
 #include "server.h"
 
+//TO-DO FINISHED
+
 // Driver code
 int main(int argc, char *argv[]) {
 
     signal(SIGINT, SIG_IGN);
 
     if (argc != 4) {
-        printf("Usage: %s {PORTO_NOTICIAS} {PORTO_CONFIG} {ficheiro configuração}\n",argv[0]);
-        exit(1);
+        printf("USAGE: %s {PORTO_NOTICIAS} {PORTO_CONFIG} {CONFIG_FILE}\n",argv[0]);
+        exit(EXIT_FAILURE);
     }
 
     int PORTO_NOTICIAS = atoi(argv[1]);
@@ -21,11 +23,11 @@ int main(int argc, char *argv[]) {
 
     struct sockaddr_in servaddr_udp, servaddr_tcp, cliaddr_tcp;
     socklen_t len_tcp = sizeof(cliaddr_tcp);
-    int udp_sockfd, tcp_sockfd, conn_tcp, j;
+    int udp_sockfd, tcp_sockfd, conn_tcp;
 
 
     if ((udp_sockfd = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)) == -1) {
-        perror("Error creating UDP socket");
+        perror("ERROR CREATING UDP SOCKET\n");
         exit(EXIT_FAILURE);
     }
 
@@ -36,7 +38,7 @@ int main(int argc, char *argv[]) {
 
     // Bind UDP socket to address
     if (bind(udp_sockfd, (struct sockaddr*)&servaddr_udp, sizeof(servaddr_udp)) == -1) {
-        perror("Error binding UDP socket");
+        perror("ERROR BINDING UDP SOCKET\n");
         exit(EXIT_FAILURE);
     }
 
@@ -44,13 +46,14 @@ int main(int argc, char *argv[]) {
 
     // Start admin authentication thread
     if (pthread_create(&admin_thread, NULL, handle_admin, &admin_args) != 0) {
-        perror("Error creating admin thread");
+        perror("ERROR CREATING ADMIN THREAD\n");
         exit(EXIT_FAILURE);
     }
 
      // Create TCP socket
     if ((tcp_sockfd = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
-        erro("Erro na criação do socket TCP");
+        perror("ERROR CREATING TCP SOCKET\n");
+        exit(EXIT_FAILURE);
     }
 
     // Filling server information
@@ -60,12 +63,14 @@ int main(int argc, char *argv[]) {
 
      // Bind TCP socket to address
     if (bind(tcp_sockfd, (struct sockaddr*)&servaddr_tcp, sizeof(servaddr_tcp)) == -1) {
-        erro("Erro no bind do socket TCP");
+        perror("ERROR BINDING TCP SOCKET\n");
+        exit(EXIT_FAILURE);
     }
 
       // Listen for incoming TCP connections
     if (listen(tcp_sockfd, SOMAXCONN) == -1) {
-        erro("Erro no listen do socket");
+        perror("ERROR LISTENING SOCKET\n");
+        exit(EXIT_FAILURE);
     }
 
     signal(SIGINT, cleanup);
@@ -74,33 +79,27 @@ int main(int argc, char *argv[]) {
     while (1) {
 
         if ((conn_tcp = accept(tcp_sockfd, (struct sockaddr *)&cliaddr_tcp, &len_tcp)) == -1) {
-            perror("Error accepting TCP connection");
+            perror("ERROR ACCEPTING TCP CONNECTION\n");
             continue;
         }
 
         HandleClientArgs client_args = {conn_tcp, list_clients, list_topics, file_config};
 
         // Find an available slot for the client thread
-        for (j = 0; j < MAX_CLIENTS; j++) {
-            if (client_threads[j] == 0) {
-                if (pthread_create(&client_threads[j], NULL, handle_client, &client_args) != 0) {
-                    perror("error creating client thread");
-                    close(conn_tcp);
+        for (int j = 0; j < MAX_CLIENTS; j++) {
+            if(j < MAX_CLIENTS){
+                if (client_threads[j] == 0) {
+                    if (pthread_create(&client_threads[j], NULL, handle_client, &client_args) != 0) {
+                        perror("ERROR CREATING CLIENT THREAD\n");
+                        close(conn_tcp);
+                        continue;
+                    }
                     break;
                 }
-                break;
             }
         }
-
-        // Maximum number of clients reached
-        if (j == MAX_CLIENTS) {
-            fprintf(stderr, "Maximum number of clients reached.\n");
-            close(conn_tcp);
-        }
     }
-
     wait(NULL);
-
     return 0;
 }
 
@@ -132,19 +131,18 @@ void init_shm(){
     
     if ((shm_id = shmget(key, sizeof(struct Entry) * MAX_TOPICS, IPC_CREAT | IPC_EXCL | 0700)) < 1){
         printf("ERROR IN SHMGET WITH IPC_CREAT\n");
-        exit(1);
+        exit(EXIT_FAILURE);
     }
 
     if((dictionary = (struct Entry*) shmat(shm_id, NULL, 0)) == (struct Entry*)-1){
         printf("ERROR ATTACHING SHARED MEMORY\n");
-        exit(0);
+        exit(EXIT_FAILURE);
     }
 
     for (int i = 0; i < MAX_TOPICS; i++) {
         dictionary[i] = (struct Entry){
             .address = "",
-            .port = 0,
-            .sockfd = 0
+            .port = 0
         };
     };
 }
@@ -165,5 +163,5 @@ void cleanup(int sig){
     destroyClientList(list_clients);
     destroyTopicList(list_topics); 
 
-    exit(0);
+    exit(EXIT_SUCCESS);
 }

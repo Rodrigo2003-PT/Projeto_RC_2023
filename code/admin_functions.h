@@ -59,15 +59,8 @@ typedef struct topicList {
     int size;
 } topicList;
 
-typedef struct news_struct {
-    char title[100];
-    char content[1000];
-    char timestamp[30];
-} news_struct;
-
 struct Entry {
     int port;
-    int sockfd;
     char address[16];
 };
 
