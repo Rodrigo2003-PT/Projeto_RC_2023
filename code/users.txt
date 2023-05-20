@@ -1,6 +1,6 @@
-jorge;mtu67453;administrator
 manuel;zpt567;leitor
-joana;azq1212;jornalista
 rodrigo;sasilva;leitor
+marta;rpt57;leitor
 jose;culatra;jornalista
 rolando;troi;jornalista
+joana;azq1212;jornalista

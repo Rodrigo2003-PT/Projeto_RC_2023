@@ -163,23 +163,31 @@ void handle_jornalista_commands(int sockfd, clientList *list, topicList *list_to
         else if(strcmp(token, "CREATE_TOPIC") == 0){
             char* multicast_id = strtok(NULL, " \n");
             char* topic_title = strtok(NULL, "\n");
-            
-            topic_struct new_topic;
-            strcpy(new_topic.name,topic_title);
-            strcpy(new_topic.multicast_address, multicast_id);
-            memset(new_topic.subscribed_clients, 0, sizeof(new_topic.subscribed_clients));
-            new_topic.num_subscribed_clients = 0;
 
-            pthread_mutex_lock(&topic_mutex);
-            addTopic(list_top,new_topic);
-            pthread_mutex_unlock(&topic_mutex);
+            if(multicast_id != NULL && topic_title != NULL){
+                topic_struct new_topic;
+                strcpy(new_topic.name,topic_title);
+                strcpy(new_topic.multicast_address, multicast_id);
+                memset(new_topic.subscribed_clients, 0, sizeof(new_topic.subscribed_clients));
+                new_topic.num_subscribed_clients = 0;
 
-            // Send a confirmation message to the client
-            char msg[MAXLINE];
-            snprintf(msg, MAXLINE, "TOPIC_CREATED: %s\n", new_topic.name);
-            if (send(sockfd, msg, strlen(msg), 0) == -1) {
-                perror("ERROR_SENDING_MESSAGE_TO_CLIENT\n");
-                exit(EXIT_FAILURE);
+                pthread_mutex_lock(&topic_mutex);
+                addTopic(list_top,new_topic);
+                pthread_mutex_unlock(&topic_mutex);
+
+                // Send a confirmation message to the client
+                char msg[MAXLINE];
+                snprintf(msg, MAXLINE, "TOPIC_CREATED: %s\n", new_topic.name);
+                if (send(sockfd, msg, strlen(msg), 0) == -1) {
+                    perror("ERROR_SENDING_MESSAGE_TO_CLIENT\n");
+                    exit(EXIT_FAILURE);
+                }
+            }
+            else{
+                if (send(sockfd, "INCORRECT_FORMAT", strlen("INCORRECT_FORMAT"), 0) == -1) {
+                    perror("ERROR_SENDING_MESSAGE_TO_CLIENT\n");
+                    exit(EXIT_FAILURE);
+                }
             }
         }
         else if(strcmp(token,"SEND_NEWS") == 0){
@@ -775,8 +783,11 @@ void subscribeTopic(topicList *list_top, client_struct *client, char* name, int 
     pthread_mutex_lock(&topic_mutex);
     topic_struct *topic = getTopic(list_top, name);
     if (topic == NULL) {
-        // Topic not found
-        printf("TOPIC '%s' NOT_FOUND\n", name);
+         // Send the multicast address to the client
+        if (send(sockfd, "NOT_FOUND\n", strlen("NOT_FOUND\n"), 0) == -1) {
+            perror("ERROR -> SENDING_MESSAGE_TO_CLIENT\n");
+            return;
+        }
         return;
     }
     // Add client to the topic's list of subscribed clients

@@ -117,32 +117,39 @@ void *server_handler(void *arg) {
             }
             char *multicast_address = strtok(recv_buffer, " \n");
 
-            HandleMulticastArgs args;
+            if(strcmp(multicast_address,"NOT_FOUND") != 0){
+                
+                HandleMulticastArgs args;
 
-            pthread_mutex_lock(&mutex);
-            for (int i = 0; i < MAX_TOPICS; i++) {
-                if (strcmp(dictionary[i].address,multicast_address) == 0) {
-                    strncpy(args.multicast_address, multicast_address, sizeof(args.multicast_address));
-                    args.multicast_port = dictionary[i].port;
-                    is_reused = true;
-                }
-            }
-            if(!is_reused){
-                multicast_port = getLargestPortNumber();
-                strncpy(args.multicast_address, multicast_address, sizeof(args.multicast_address));
-                args.multicast_port = multicast_port;
-            }
-            pthread_mutex_unlock(&mutex);
-
-            for(int i = 0; i < MAX_TOPICS; i++){
-                if(topic_threads[i] == 0){
-                    if (pthread_create(&topic_threads[i], NULL, multicast_receiver_handler, &args) != 0) {
-                        perror("ERROR CREATING MULTICAST THREAD\n");
-                        close(sockfd);
-                        exit(EXIT_FAILURE);
+                pthread_mutex_lock(&mutex);
+                for (int i = 0; i < MAX_TOPICS; i++) {
+                    if (strcmp(dictionary[i].address,multicast_address) == 0) {
+                        strncpy(args.multicast_address, multicast_address, sizeof(args.multicast_address));
+                        args.multicast_port = dictionary[i].port;
+                        is_reused = true;
                     }
-                    break;
                 }
+                if(!is_reused){
+                    multicast_port = getLargestPortNumber();
+                    strncpy(args.multicast_address, multicast_address, sizeof(args.multicast_address));
+                    args.multicast_port = multicast_port;
+                }
+                pthread_mutex_unlock(&mutex);
+
+                for(int i = 0; i < MAX_TOPICS; i++){
+                    if(topic_threads[i] == 0){
+                        if (pthread_create(&topic_threads[i], NULL, multicast_receiver_handler, &args) != 0) {
+                            perror("ERROR CREATING MULTICAST THREAD\n");
+                            close(sockfd);
+                            exit(EXIT_FAILURE);
+                        }
+                        break;
+                    }
+                }
+
+            }
+            else{
+                printf("TOPIC NOT_FOUND\n");
             }
         }
 
@@ -171,35 +178,49 @@ void *server_handler(void *arg) {
                 close(sockfd);
                 exit(EXIT_FAILURE);
             }
-            char *topic_created = strtok(recv_buffer, "\n");
-            printf("%s\n",topic_created);
+
+            if(strncmp(recv_buffer,"INCORRECT_FORMAT",17) == 0){
+                printf("INCORRECT_FORMAT\n");
+            }
+            else{
+                char *topic_created = strtok(recv_buffer, "\n");
+                printf("%s\n",topic_created);
+            }
         }
 
         else if(strcmp(token,"SEND_NEWS") == 0){
             char* multicast_id = strtok(NULL," ");
             char* message = strtok(NULL,"\n");
-           
-            if (send(sockfd, buffer, MAXLINE, 0) == -1) {
-                perror("ERROR SENDING MESSAGE TO SERVER\n");
-                close(sockfd);
-                exit(EXIT_FAILURE);
-            }
 
-            if (recv(sockfd, recv_buffer, MAXLINE, 0) == -1) {
-                perror("ERROR RECEIVING COMMAND FROM SERVER\n");
-                close(sockfd);
-                exit(EXIT_FAILURE);
-            }
+            if(multicast_id != NULL && message != NULL){
 
-            if(strncmp(recv_buffer,"SUCCESSFULL",11) == 0){
-                pthread_mutex_lock(&mutex);
-                for (int i = 0; i < MAX_TOPICS; i++) {
-                    if (strcmp(dictionary[i].address, multicast_id) == 0) {
-                        multicast_send(dictionary[i].port, multicast_id, message);
-                        break;
-                    }
+
+                if (send(sockfd, buffer, MAXLINE, 0) == -1) {
+                    perror("ERROR SENDING MESSAGE TO SERVER\n");
+                    close(sockfd);
+                    exit(EXIT_FAILURE);
                 }
-                pthread_mutex_unlock(&mutex);
+
+                if (recv(sockfd, recv_buffer, MAXLINE, 0) == -1) {
+                    perror("ERROR RECEIVING COMMAND FROM SERVER\n");
+                    close(sockfd);
+                    exit(EXIT_FAILURE);
+                }
+
+                if(strncmp(recv_buffer,"SUCCESSFULL",11) == 0){
+                    pthread_mutex_lock(&mutex);
+                    for (int i = 0; i < MAX_TOPICS; i++) {
+                        if (strcmp(dictionary[i].address, multicast_id) == 0) {
+                            multicast_send(dictionary[i].port, multicast_id, message);
+                            break;
+                        }
+                    }
+                    pthread_mutex_unlock(&mutex);
+                }
+
+            }
+            else{
+                printf("INCORRECT_FORMAT\n");
             }
         }
         else printf("INVALID_COMMAND\n");
