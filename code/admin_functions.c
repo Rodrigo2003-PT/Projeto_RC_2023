@@ -485,7 +485,7 @@ void quitConsole(int sockfd) {
 void quitServer(int sockfd) {
     printf("SERVER_SHUTTING_DOWN\n");
     close(sockfd);
-    exit(EXIT_SUCCESS);
+    kill(getpid(),SIGINT);
 }
 
 void erro(char *s) {

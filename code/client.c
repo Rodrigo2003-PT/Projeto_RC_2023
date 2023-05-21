@@ -98,7 +98,8 @@ void *server_handler(void *arg) {
         char* token = strtok(buffer_copy, " \n");
 
         if (strcmp(token, "QUIT") == 0) {
-            break;
+            close(sockfd);
+            kill(getpid(),SIGINT);
         }
 
         else if(strcmp(token,"SUBSCRIBE_TOPIC") == 0){
@@ -225,8 +226,6 @@ void *server_handler(void *arg) {
         }
         else printf("INVALID_COMMAND\n");
     }
-    close(sockfd);
-    pthread_exit(NULL);
 }
 
 void multicast_send(int multicast_port, char* group_address, char* message){
